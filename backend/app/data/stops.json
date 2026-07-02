@@ -1,0 +1,12 @@
+[
+  {"id": "01012", "name": "Hotel Grand Pacific", "road": "Victoria St", "lat": 1.29685, "lon": 103.85254},
+  {"id": "01013", "name": "St. Joseph's Ch", "road": "Victoria St", "lat": 1.29771, "lon": 103.85322},
+  {"id": "01019", "name": "Bras Basah Cplx", "road": "North Bridge Rd", "lat": 1.29699, "lon": 103.85302},
+  {"id": "01029", "name": "Opp Natl Lib", "road": "North Bridge Rd", "lat": 1.29820, "lon": 103.85410},
+  {"id": "01039", "name": "Bugis Cube", "road": "North Bridge Rd", "lat": 1.29855, "lon": 103.85560},
+  {"id": "01059", "name": "Bugis Stn Exit B", "road": "Victoria St", "lat": 1.30012, "lon": 103.85622},
+  {"id": "01109", "name": "Bugis Junction", "road": "Victoria St", "lat": 1.29938, "lon": 103.85520},
+  {"id": "02049", "name": "Opp The Fullerton", "road": "Fullerton Sq", "lat": 1.28580, "lon": 103.85300},
+  {"id": "04111", "name": "Capitol Bldg", "road": "North Bridge Rd", "lat": 1.29320, "lon": 103.85150},
+  {"id": "04168", "name": "Stamford Ct", "road": "Stamford Rd", "lat": 1.29450, "lon": 103.85080}
+]
