@@ -12,7 +12,9 @@
 * { box-sizing: border-box; }
 body { margin: 0; font-family: 'Roboto', sans-serif; background: var(--bg); color: #222; }
 
-.layout { display: grid; grid-template-columns: 260px 1fr 1fr; grid-template-rows: 56px 1fr; height: 100vh; }
+.layout { display: grid; grid-template-columns: 260px 1fr 1fr; grid-template-rows: 56px 1fr 26px; height: 100vh; }
+.footer { grid-column: 1 / 4; background: var(--navy); color: #fff; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 12px; }
+.footer .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--shopee-yellow); }
 .header { grid-column: 1 / 4; background: var(--shopee-orange); color: #fff; display: flex; align-items: center; gap: 16px; padding: 0 16px; }
 .header h1 { font-size: 20px; margin: 0; font-weight: 700; }
 .badge { background: var(--shopee-yellow); color: var(--navy); border-radius: 10px; padding: 2px 10px; font-size: 12px; font-weight: 700; }

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { addFavourite, deleteFavourite, getFavourites, getHealth, getNearby, getRoute, renameFavourite, search } from './api';
+import { addFavourite, deleteFavourite, getArrivals, getFavourites, getHealth, getNearby, getRoute, renameFavourite, search } from './api';
 import SearchBar from './components/SearchBar';
 import StopCard from './components/StopCard';
 import BusMap from './components/BusMap';
@@ -42,8 +42,27 @@ export default function App() {
     return null;
   };
 
-  const onShowBus = (serviceNo, positions, stopName) =>
-    setMapTarget({ type: 'bus', serviceNo, positions, stopName });
+  const onShowBus = (stopId, serviceNo, positions, stopName) =>
+    setMapTarget({ type: 'bus', stopId, serviceNo, positions, stopName });
+
+  useEffect(() => {
+    if (!mapTarget || mapTarget.type !== 'bus') return undefined;
+    const timer = setInterval(() => {
+      getArrivals(mapTarget.stopId)
+        .then((d) => {
+          const svc = d.services.find((s) => s.service_no === mapTarget.serviceNo);
+          if (svc) {
+            setMapTarget((prev) =>
+              prev && prev.type === 'bus' && prev.stopId === mapTarget.stopId && prev.serviceNo === mapTarget.serviceNo
+                ? { ...prev, positions: svc.bus_positions }
+                : prev
+            );
+          }
+        })
+        .catch(() => {});
+    }, 15000);
+    return () => clearInterval(timer);
+  }, [mapTarget?.type, mapTarget?.stopId, mapTarget?.serviceNo]);
 
   const onShowRoute = (serviceNo) =>
     getRoute(serviceNo)
@@ -101,6 +120,14 @@ export default function App() {
       <section className="mappane">
         <BusMap target={mapTarget} />
       </section>
+      <footer className="footer">
+        <span className="dot" />
+        {mode === 'demo'
+          ? 'DEMO MODE — simulated buses over real Singapore route geometry. Add your LTA DataMall key in backend/.env to go live.'
+          : mode === 'live'
+            ? 'LIVE MODE — real-time data from LTA DataMall.'
+            : 'Backend offline — start the API server on port 8000.'}
+      </footer>
     </div>
   );
 }

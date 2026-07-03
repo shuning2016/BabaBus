@@ -46,7 +46,7 @@ export default function StopCard({
               {svc.etas.map((eta, i) => (
                 <span key={i} className={`eta ${eta <= 1 ? 'now' : ''}`}
                   title="Show bus on map"
-                  onClick={() => onShowBus(svc.service_no, svc.bus_positions, data.stop_name)}>
+                  onClick={() => onShowBus(stop.id, svc.service_no, svc.bus_positions, data.stop_name)}>
                   {eta <= 0 ? 'Arr' : `${eta} min`}
                 </span>
               ))}
