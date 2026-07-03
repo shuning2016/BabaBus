@@ -14,6 +14,10 @@ to power a native mobile app later.
 - Favourites with groups ("Going out" / "Coming back") and rename
 - Route visualization on the map
 - Browser notification when a watched bus is ≤ 3 min away
+- **Bus alarms**: watch a bus at a stop during a daily time window
+  (e.g. 143 at Caribbean 06:40–07:00) — live banner + notifications
+- Live bus overlay on the explore map; pan anywhere to load stops
+- Installable PWA (Android/desktop) with a mobile bottom-tab layout
 - Server-side 15 s cache with stale-data fallback
 
 ## Run it
@@ -41,7 +45,9 @@ To go live, register free at https://datamall.lta.gov.sg, then:
     cp .env.example .env   # paste your key into LTA_ACCOUNT_KEY
     # restart uvicorn — the header badge switches to LIVE MODE
 
-Note: in live mode the first route lookup downloads LTA's full route table (~30 s), then it's cached in memory.
+Live mode serves stops/routes from bundled snapshots (`backend/app/data/lta_*.json`);
+arrivals are always fetched live. Refresh the snapshots occasionally with
+`backend/scripts/refresh_lta_snapshots.py`.
 
 ## Deploy to Vercel
 
@@ -51,11 +57,31 @@ Just import the repo at vercel.com — no settings needed.
 
 - To go live on Vercel, add an `LTA_ACCOUNT_KEY` environment variable in the
   Vercel project settings.
-- Favourites use SQLite at `/tmp` on Vercel, so they reset between serverless
-  invocations — fine for playing around; a hosted DB (e.g. Turso) is the
-  future fix.
-- In live mode, route lookups can exceed the serverless time budget on the
-  first call (LTA's full route table download); demo mode is unaffected.
+- For persistent favourites/alarms, set `TURSO_URL` and `TURSO_TOKEN`
+  (Turso/libSQL). Without them, data lives in per-instance `/tmp` SQLite
+  and resets between serverless invocations.
+
+## Install on your phone
+
+**Android / desktop Chrome** — open the deployed site and tap the **⬇ Install**
+button in the header (or Chrome menu → "Install app").
+
+**iPhone, no Mac tooling needed** — Safari → Share → "Add to Home Screen"
+installs the PWA.
+
+**iPhone, native app (Capacitor)** — the repo contains a ready Xcode project
+at `frontend/ios/` (WKWebView shell around the same UI, talking to the hosted
+API). To build it you need Xcode from the Mac App Store, then:
+
+    cd frontend
+    npm install
+    npm run build:ios      # web bundle with the hosted API baked in
+    npm run ios            # opens the project in Xcode
+
+In Xcode: select the `App` target → Signing & Capabilities → choose your
+Apple ID team (a free account works; apps expire after 7 days, paid
+developer accounts don't), plug in your iPhone, pick it as the run target,
+and press ▶. Dependencies resolve via Swift Package Manager — no CocoaPods.
 
 ## Tests
 
@@ -64,4 +90,4 @@ Just import the repo at vercel.com — no settings needed.
 ## Roadmap
 
 - Train timings, EZ-Link module (pending public APIs)
-- Native mobile app consuming this same API
+- Background push notifications for bus alarms

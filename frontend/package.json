@@ -6,10 +6,15 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:ios": "VITE_API_BASE=https://baba-bus.vercel.app vite build && cap copy ios",
+    "ios": "cap open ios",
     "lint": "oxlint",
     "preview": "vite preview"
   },
   "dependencies": {
+    "@capacitor/cli": "^8.4.1",
+    "@capacitor/core": "^8.4.1",
+    "@capacitor/ios": "^8.4.1",
     "leaflet": "^1.9.4",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",

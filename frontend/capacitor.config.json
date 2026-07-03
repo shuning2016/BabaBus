@@ -1,0 +1,8 @@
+{
+  "appId": "com.shuning.bababus",
+  "appName": "BabaBus",
+  "webDir": "dist",
+  "ios": {
+    "contentInset": "always"
+  }
+}
