@@ -1,10 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
-import { addFavourite, deleteFavourite, getArrivals, getFavourites, getHealth, getNearby, getRoute, renameFavourite, search } from './api';
+import { addFavourite, addSchedule, deleteFavourite, getArrivals, getFavourites, getHealth, getNearby, getRoute, getSchedules, renameFavourite, search } from './api';
 import SearchBar from './components/SearchBar';
 import StopCard from './components/StopCard';
 import BusMap from './components/BusMap';
 import FavouritesPanel from './components/FavouritesPanel';
+import AlarmsPanel from './components/AlarmsPanel';
 import useWatch from './useWatch';
+import useAlarms from './useAlarms';
+import { HHMM_RE } from './alarmClock';
 
 const DEFAULT_CENTER = { lat: 1.2975, lon: 103.854 }; // Bugis — demo dataset area
 const AUTOWATCH_KEY = 'bababus-autowatch';
@@ -33,15 +36,19 @@ export default function App() {
   const [exploreCenter, setExploreCenter] = useState(null); // [lat, lon] of a user-picked place
   const [favourites, setFavourites] = useState([]);
   const [areaBuses, setAreaBuses] = useState([]); // live buses near the explore view
+  const [schedules, setSchedules] = useState([]);
   const { watched, toggleWatch } = useWatch();
+  const activeAlarms = useAlarms(schedules);
   const lastLoad = useRef(null); // [lat, lon] of the last nearby fetch
 
   const refreshFavs = () => getFavourites().then((d) => setFavourites(d.favourites));
+  const refreshSchedules = () => getSchedules().then((d) => setSchedules(d.schedules));
 
   useEffect(() => {
     getHealth().then((h) => setMode(h.mode)).catch(() => setMode('offline'));
     loadNearby();
     refreshFavs();
+    refreshSchedules();
   }, []);
 
   const loadNearby = () => {
@@ -169,6 +176,30 @@ export default function App() {
     }).then(refreshFavs);
   };
 
+  const askTime = (message, fallback) => {
+    for (;;) {
+      const t = window.prompt(message, fallback);
+      if (t === null) return null;
+      if (HHMM_RE.test(t.trim())) return t.trim();
+      fallback = t; // let the user correct their typo
+    }
+  };
+
+  const onCreateAlarm = (stopObj, serviceNo) => {
+    const start = askTime(`Watch bus ${serviceNo} at ${stopObj.name} from (HH:MM):`, '06:40');
+    if (!start) return;
+    const end = askTime('until (HH:MM):', '07:00');
+    if (!end) return;
+    if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+    addSchedule({
+      stop_id: stopObj.id, service_no: serviceNo,
+      start_time: start, end_time: end,
+      label: `${serviceNo} @ ${stopObj.name}`,
+    }).then(refreshSchedules);
+  };
+
   const openFavouriteBus = (fav) => {
     openFavourite(fav.stop_id);
     getArrivals(fav.stop_id)
@@ -214,6 +245,8 @@ export default function App() {
         <span className="badge">{mode.toUpperCase()} MODE</span>
       </header>
       <aside className="sidebar">
+        <h4 style={{ color: 'var(--shopee-yellow)' }}>BUS ALARMS</h4>
+        <AlarmsPanel schedules={schedules} active={activeAlarms} onChanged={refreshSchedules} />
         <h4 style={{ color: 'var(--shopee-yellow)' }}>FAVOURITES</h4>
         <FavouritesPanel
           favourites={favourites}
@@ -229,13 +262,22 @@ export default function App() {
         />
       </aside>
       <main className="main">
+        {activeAlarms.map(({ schedule: s, stopName, etas }) => (
+          <div className="alarmbanner" key={s.id}>
+            ⏰ Bus <strong>{s.service_no}</strong> at {stopName}:{' '}
+            {etas.length
+              ? <strong>{etas[0] <= 0 ? 'arriving now' : `${etas[0]} min`}</strong>
+              : 'no live timing yet'}
+            {etas.length > 1 && <span> · then {etas.slice(1).map((e) => `${e} min`).join(', ')}</span>}
+          </div>
+        ))}
         <h2 style={{ color: 'var(--navy)', fontSize: 17 }}>
           {heading}{' '}
           <button className="plain" title="Refresh nearby" onClick={loadNearby}>📍</button>
         </h2>
         {stops.map((s) => (
           <StopCard key={s.id} stop={s} onShowBus={onShowBus} onShowRoute={onShowRoute}
-            onFavourite={onFavourite} onFavouriteBus={onFavouriteBus}
+            onFavourite={onFavourite} onFavouriteBus={onFavouriteBus} onCreateAlarm={onCreateAlarm}
             watched={watched} toggleWatch={toggleWatch} />
         ))}
       </main>

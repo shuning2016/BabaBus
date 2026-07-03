@@ -24,6 +24,10 @@ body { margin: 0; font-family: 'Roboto', sans-serif; background: var(--bg); colo
 .maphint { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); z-index: 1000; background: var(--navy); color: #fff; font-size: 11px; padding: 4px 12px; border-radius: 12px; opacity: .92; white-space: nowrap; pointer-events: none; }
 .mapclose { position: absolute; top: 8px; right: 8px; z-index: 1000; background: var(--shopee-orange); color: #fff; border: none; border-radius: 12px; padding: 4px 12px; font-size: 11px; font-weight: 700; cursor: pointer; font-family: inherit; }
 .favchip { background: var(--shopee-yellow); color: var(--navy); border-radius: 8px; padding: 0 6px; font-size: 11px; font-weight: 700; margin-left: 4px; }
+.alarm { padding: 6px 4px; border-radius: 6px; font-size: 14px; }
+.alarm:hover { background: rgba(255,255,255,.1); }
+.alarmlabel { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.alarmbanner { background: var(--shopee-yellow); color: var(--navy); border-radius: 8px; padding: 8px 12px; margin-bottom: 10px; font-size: 14px; box-shadow: 0 1px 4px rgba(23,43,77,.2); }
 
 .card { background: #fff; border-radius: 8px; box-shadow: 0 1px 4px rgba(23,43,77,.15); margin-bottom: 12px; padding: 12px; }
 .card h3 { margin: 0; font-size: 15px; color: var(--navy); }

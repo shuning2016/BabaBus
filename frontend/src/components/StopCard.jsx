@@ -5,7 +5,8 @@ import CapacityBar from './CapacityBar';
 const POLL_MS = 15000;
 
 export default function StopCard({
-  stop, onShowBus, onShowRoute, onFavourite, onFavouriteBus, watched, toggleWatch, defaultOpen = false,
+  stop, onShowBus, onShowRoute, onFavourite, onFavouriteBus, onCreateAlarm,
+  watched, toggleWatch, defaultOpen = false,
 }) {
   const [open, setOpen] = useState(defaultOpen);
   const [data, setData] = useState(null);
@@ -63,6 +64,10 @@ export default function StopCard({
                 style={{ opacity: watched(stop.id, svc.service_no) ? 1 : 0.4 }}
                 onClick={() => toggleWatch(stop.id, svc.service_no)}>
                 🔔
+              </button>
+              <button className="plain" title="Watch this bus at set times every day"
+                onClick={() => onCreateAlarm(stop, svc.service_no)}>
+                ⏰
               </button>
             </div>
           ))}

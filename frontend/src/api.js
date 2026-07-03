@@ -27,3 +27,8 @@ export const addFavourite = (body) => j('/api/favourites', post(body));
 export const renameFavourite = (id, name) =>
   j(`/api/favourites/${id}`, { ...post({ custom_name: name }), method: 'PATCH' });
 export const deleteFavourite = (id) => j(`/api/favourites/${id}`, { method: 'DELETE' });
+export const getSchedules = () => j('/api/schedules');
+export const addSchedule = (body) => j('/api/schedules', post(body));
+export const updateSchedule = (id, body) =>
+  j(`/api/schedules/${id}`, { ...post(body), method: 'PATCH' });
+export const deleteSchedule = (id) => j(`/api/schedules/${id}`, { method: 'DELETE' });
