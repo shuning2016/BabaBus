@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { getHealth, getNearby } from './api';
+import { getHealth, getNearby, getRoute } from './api';
 import SearchBar from './components/SearchBar';
 import StopCard from './components/StopCard';
+import BusMap from './components/BusMap';
 
 const DEFAULT_CENTER = { lat: 1.2975, lon: 103.854 }; // Bugis — demo dataset area
 
@@ -9,6 +10,7 @@ export default function App() {
   const [mode, setMode] = useState('...');
   const [stops, setStops] = useState([]);
   const [heading, setHeading] = useState('Nearby stops');
+  const [mapTarget, setMapTarget] = useState(null);
 
   useEffect(() => {
     getHealth().then((h) => setMode(h.mode)).catch(() => setMode('offline'));
@@ -33,9 +35,15 @@ export default function App() {
     return null;
   };
 
-  // Placeholders — real implementations arrive in Tasks 10 and 11:
-  const onShowBus = () => {};
-  const onShowRoute = () => {};
+  const onShowBus = (serviceNo, positions, stopName) =>
+    setMapTarget({ type: 'bus', serviceNo, positions, stopName });
+
+  const onShowRoute = (serviceNo) =>
+    getRoute(serviceNo)
+      .then((route) => setMapTarget({ type: 'route', route }))
+      .catch(() => setMapTarget(null));
+
+  // Placeholders — real implementations arrive in Task 11:
   const onFavourite = () => {};
   const watched = () => false;
   const toggleWatch = () => {};
@@ -63,7 +71,9 @@ export default function App() {
             onFavourite={onFavourite} watched={watched} toggleWatch={toggleWatch} />
         ))}
       </main>
-      <section className="mappane" />
+      <section className="mappane">
+        <BusMap target={mapTarget} />
+      </section>
     </div>
   );
 }
