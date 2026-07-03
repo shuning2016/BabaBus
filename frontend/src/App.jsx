@@ -25,6 +25,7 @@ const autoWatchStore = {
 
 const TABS = [
   { id: 'fav', icon: '⭐', label: 'Favourite' },
+  { id: 'alarms', icon: '⏰', label: 'Alarms' },
   { id: 'map', icon: '🗺️', label: 'Map' },
   { id: 'nearby', icon: '📍', label: 'Nearby' },
 ];
@@ -241,18 +242,19 @@ export default function App() {
       <div className="content">
         <section className="pane pane-fav">
           <AlarmBanners />
-          {schedules.length > 0 && (
-            <div className="favsection">
-              <h4 className="sectiontitle">Bus Alarms</h4>
-              <AlarmsPanel schedules={schedules} active={activeAlarms} onChanged={refreshSchedules} />
-            </div>
-          )}
           <FavouritesPanel
             favourites={favourites}
             onShowBus={onShowBus} onShowRoute={onShowRoute} onCreateAlarm={onCreateAlarm}
             onRename={renameFav} onDelete={(id) => deleteFavourite(id).then(refreshFavs)}
             watched={watched} toggleWatch={toggleAutoWatch}
           />
+        </section>
+
+        <section className="pane pane-alarms">
+          <div className="paneheader">
+            <h2>Bus Alarms</h2>
+          </div>
+          <AlarmsPanel schedules={schedules} active={activeAlarms} onChanged={refreshSchedules} />
         </section>
 
         <section className="pane pane-map">

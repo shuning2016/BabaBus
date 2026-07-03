@@ -42,6 +42,7 @@ h1, h2, h3, h4 { margin: 0; }
 .pane { position: absolute; inset: 0; overflow-y: auto; padding: 14px; visibility: hidden; pointer-events: none; -webkit-overflow-scrolling: touch; }
 .pane-map { padding: 0; }
 .app.tab-fav .pane-fav,
+.app.tab-alarms .pane-alarms,
 .app.tab-map .pane-map,
 .app.tab-nearby .pane-nearby { visibility: visible; pointer-events: auto; }
 
@@ -100,10 +101,18 @@ button.plain:hover { background: #F4F5F7; }
 .empty { color: var(--muted); font-size: 14px; line-height: 1.5; background: #fff; border-radius: 14px; padding: 20px; text-align: center; }
 
 .alarmbanner { background: #FFF7E0; border-left: 4px solid var(--shopee-yellow); color: var(--navy); border-radius: 10px; padding: 10px 14px; margin-bottom: 10px; font-size: 14px; }
-.alarm { padding: 8px 4px; border-radius: 8px; font-size: 14px; border-top: 1px solid var(--line); }
-.alarm:first-child { border-top: none; }
-.alarmlabel { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); }
 .favchip { background: var(--shopee-yellow); color: var(--navy); border-radius: 8px; padding: 1px 7px; font-size: 11px; font-weight: 700; margin-left: 4px; }
+
+/* Editable alarm cards (Alarms tab) */
+.alarmcard.paused { opacity: .55; }
+.alarmcard .cardhead { align-items: center; }
+.alarmname { flex: 1; min-width: 0; border: none; border-bottom: 1.5px solid transparent; background: none; font-family: inherit; font-size: 15px; font-weight: 700; color: var(--navy); padding: 3px 2px; }
+.alarmname:hover { border-bottom-color: var(--line); }
+.alarmname:focus { outline: none; border-bottom-color: var(--shopee-orange); }
+.alarmtimes { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.alarmtimes input[type="time"] { font-family: inherit; font-size: 14px; font-weight: 700; color: var(--navy); border: 1.5px solid var(--line); border-radius: 8px; padding: 6px 8px; background: #fff; }
+.alarmtimes input[type="time"]:focus { outline: none; border-color: var(--shopee-orange); }
+.alarmlive { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); font-size: 13px; }
 
 /* ---------- Map ---------- */
 .mapclose { position: absolute; top: 12px; left: 12px; z-index: 1000; background: #fff; color: var(--navy); border: none; border-radius: 999px; padding: 8px 14px; font-size: 12px; font-weight: 700; cursor: pointer; font-family: inherit; box-shadow: 0 2px 8px rgba(0,0,0,.2); }
