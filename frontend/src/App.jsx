@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { addFavourite, deleteFavourite, getArrivals, getFavourites, getHealth, getNearby, getRoute, renameFavourite, search } from './api';
 import SearchBar from './components/SearchBar';
 import StopCard from './components/StopCard';
@@ -8,6 +8,13 @@ import useWatch from './useWatch';
 
 const DEFAULT_CENTER = { lat: 1.2975, lon: 103.854 }; // Bugis — demo dataset area
 const AUTOWATCH_KEY = 'bababus-autowatch';
+
+// Approximate metres between two lat/lon points (fine at city scale)
+const approxMetres = (a, b) => {
+  const dLat = (a[0] - b[0]) * 111320;
+  const dLon = (a[1] - b[1]) * 111320 * Math.cos((a[0] * Math.PI) / 180);
+  return Math.sqrt(dLat * dLat + dLon * dLon);
+};
 
 const autoWatchStore = {
   read: () => new Set(JSON.parse(localStorage.getItem(AUTOWATCH_KEY) || '[]')),
@@ -26,6 +33,7 @@ export default function App() {
   const [exploreCenter, setExploreCenter] = useState(null); // [lat, lon] of a user-picked place
   const [favourites, setFavourites] = useState([]);
   const { watched, toggleWatch } = useWatch();
+  const lastLoad = useRef(null); // [lat, lon] of the last nearby fetch
 
   const refreshFavs = () => getFavourites().then((d) => setFavourites(d.favourites));
 
@@ -41,6 +49,8 @@ export default function App() {
         if (d.stops.length === 0 && (lat !== DEFAULT_CENTER.lat)) {
           return useCenter(DEFAULT_CENTER.lat, DEFAULT_CENTER.lon); // demo data fallback
         }
+        lastLoad.current = [lat, lon];
+        setExploreCenter([lat, lon]);
         setStops(d.stops);
         setHeading('Nearby stops');
         return null;
@@ -82,20 +92,30 @@ export default function App() {
 
   const onPickPoint = (lat, lon) => {
     setExploreCenter([lat, lon]);
+    lastLoad.current = [lat, lon];
     return getNearby(lat, lon).then((d) => {
       setStops(d.stops);
-      setHeading(d.stops.length ? 'Stops near selected point' : 'No stops here (demo data covers Bugis)');
+      setHeading(d.stops.length ? 'Stops near selected point' : 'No stops here');
     });
   };
 
   const onPickPlace = (place) => {
     setMapTarget(null); // jump back to the explore map
     setExploreCenter([place.lat, place.lon]);
+    lastLoad.current = [place.lat, place.lon];
     getNearby(place.lat, place.lon).then((d) => {
       setStops(d.stops);
-      setHeading(d.stops.length
-        ? `Stops near ${place.label}`
-        : `No stops near ${place.label} (demo data covers Bugis)`);
+      setHeading(d.stops.length ? `Stops near ${place.label}` : `No stops near ${place.label}`);
+    });
+  };
+
+  // Panning the explore map loads the stops around the new view automatically.
+  const onMapMove = (lat, lon) => {
+    if (lastLoad.current && approxMetres([lat, lon], lastLoad.current) < 200) return;
+    lastLoad.current = [lat, lon];
+    getNearby(lat, lon).then((d) => {
+      setStops(d.stops);
+      setHeading(d.stops.length ? 'Stops in this area' : 'No stops in this area');
     });
   };
 
@@ -194,7 +214,7 @@ export default function App() {
             ✕ explore
           </button>
         )}
-        <BusMap target={mapTarget} stops={stops} onPickPoint={onPickPoint} center={exploreCenter} />
+        <BusMap target={mapTarget} stops={stops} onPickPoint={onPickPoint} onMapMove={onMapMove} center={exploreCenter} />
       </section>
       <footer className="footer">
         <span className="dot" />

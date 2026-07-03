@@ -28,7 +28,8 @@ body { margin: 0; font-family: 'Roboto', sans-serif; background: var(--bg); colo
 .card { background: #fff; border-radius: 8px; box-shadow: 0 1px 4px rgba(23,43,77,.15); margin-bottom: 12px; padding: 12px; }
 .card h3 { margin: 0; font-size: 15px; color: var(--navy); }
 .muted { color: #777; font-size: 12px; }
-.svc-chip { background: var(--shopee-orange); color: #fff; border-radius: 6px; padding: 2px 8px; font-weight: 700; min-width: 42px; text-align: center; display: inline-block; }
+/* Also used as a <button>; keep background/border here so button resets can't blank it out. */
+.svc-chip { background: var(--shopee-orange); color: #fff; border: none; cursor: pointer; font-family: inherit; font-size: 13px; border-radius: 6px; padding: 2px 8px; font-weight: 700; min-width: 42px; text-align: center; display: inline-block; }
 .eta { cursor: pointer; font-weight: 500; color: var(--bright-blue); padding: 2px 6px; border-radius: 4px; }
 .eta:hover { background: #E6F4FB; }
 .eta.now { color: var(--shopee-red); font-weight: 700; }

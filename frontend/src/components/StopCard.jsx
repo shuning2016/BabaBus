@@ -39,7 +39,7 @@ export default function StopCard({
           {data.stale && <p className="stale">⚠ showing last known timings</p>}
           {data.services.map((svc) => (
             <div className="row" key={svc.service_no}>
-              <button className="plain svc-chip" title="View route"
+              <button className="svc-chip" title="View route"
                 onClick={() => onShowRoute(svc.service_no)}>
                 {svc.service_no}
               </button>

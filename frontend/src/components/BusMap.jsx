@@ -33,6 +33,16 @@ function ClickCatcher({ onPickPoint }) {
   return null;
 }
 
+function MoveCatcher({ onMapMove }) {
+  useMapEvents({
+    moveend: (e) => {
+      const c = e.target.getCenter();
+      onMapMove(c.lat, c.lng);
+    },
+  });
+  return null;
+}
+
 /** Popup body that loads a station's live arrivals when opened. */
 function StopArrivalsPopup({ stop }) {
   const [services, setServices] = useState(null);
@@ -65,10 +75,12 @@ function StopArrivalsPopup({ stop }) {
   );
 }
 
-export default function BusMap({ target, stops = [], onPickPoint, center }) {
+export default function BusMap({ target, stops = [], onPickPoint, onMapMove, center }) {
   const explore = !target;
+  // In explore mode, only recenter when the picked place changes — never on
+  // stop updates, so panning the map doesn't get yanked back by FitBounds.
   const points = explore
-    ? [...stops.map((s) => [s.lat, s.lon]), ...(center ? [center] : [])]
+    ? (center ? [center] : stops.map((s) => [s.lat, s.lon]))
     : target.type === 'bus'
       ? target.positions.map((p) => [p.lat, p.lon])
       : target.route.polyline;
@@ -81,6 +93,7 @@ export default function BusMap({ target, stops = [], onPickPoint, center }) {
       />
       <FitBounds points={points} />
       {explore && onPickPoint && <ClickCatcher onPickPoint={onPickPoint} />}
+      {explore && onMapMove && <MoveCatcher onMapMove={onMapMove} />}
       {explore && center && (
         <Marker position={center} icon={placeIcon}>
           <Popup>Selected location</Popup>
