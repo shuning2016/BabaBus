@@ -6,6 +6,7 @@ from .. import db
 router = APIRouter(prefix="/api/schedules")
 
 HHMM = r"^([01]\d|2[0-3]):[0-5]\d$"
+DAYS = r"^[01]{7}$"  # Mon..Sun mask
 
 
 class ScheduleIn(BaseModel):
@@ -15,6 +16,7 @@ class ScheduleIn(BaseModel):
     end_time: str = Field(pattern=HHMM)
     label: str = ""
     remind_every: int = Field(default=4, ge=1, le=60)  # push cadence, minutes
+    days: str = Field(default="1111111", pattern=DAYS)
 
 
 class ScheduleUpdate(BaseModel):
@@ -23,6 +25,7 @@ class ScheduleUpdate(BaseModel):
     end_time: str | None = Field(default=None, pattern=HHMM)
     label: str | None = None
     remind_every: int | None = Field(default=None, ge=1, le=60)
+    days: str | None = Field(default=None, pattern=DAYS)
 
 
 @router.get("")
@@ -33,7 +36,7 @@ def list_all():
 @router.post("")
 def create(s: ScheduleIn):
     schedule_id = db.add_schedule(
-        s.stop_id, s.service_no, s.start_time, s.end_time, s.label, s.remind_every
+        s.stop_id, s.service_no, s.start_time, s.end_time, s.label, s.remind_every, s.days
     )
     return {"id": schedule_id, "enabled": True, **s.model_dump()}
 

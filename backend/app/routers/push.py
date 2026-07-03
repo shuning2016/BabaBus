@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from pywebpush import WebPushException
 
 from .. import db
-from ..alarms import within_window
+from ..alarms import active_on, within_window
 from ..config import settings
 from ..deps import get_datasource
 from ..push import send_web_push
@@ -75,6 +75,7 @@ def tick(secret: str = Query("")):
     _guard(secret)
     now = datetime.now(SGT)
     now_min = now.hour * 60 + now.minute
+    weekday = now.weekday()  # Mon=0 … Sun=6
     now_epoch = int(now.timestamp())
 
     subs = db.list_subscriptions()
@@ -85,6 +86,8 @@ def tick(secret: str = Query("")):
     pushed = []
     for s in db.list_schedules():
         if not s["enabled"] or not within_window(now_min, s["start_time"], s["end_time"]):
+            continue
+        if not active_on(s.get("days") or "1111111", weekday):
             continue
         every = s.get("remind_every") or 4
         last = s.get("last_push")

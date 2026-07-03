@@ -12,3 +12,8 @@ def within_window(now_min: int, start: str, end: str) -> bool:
     if s <= e:
         return s <= now_min < e
     return now_min >= s or now_min < e
+
+
+def active_on(days: str, weekday: int) -> bool:
+    """days is a 7-char mask, index 0=Monday … 6=Sunday (Python weekday())."""
+    return len(days) == 7 and days[weekday] == "1"

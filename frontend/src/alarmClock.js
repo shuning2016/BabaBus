@@ -16,3 +16,9 @@ export const isWithinWindow = (nowMin, start, end) => {
 };
 
 export const minutesNow = (d = new Date()) => d.getHours() * 60 + d.getMinutes();
+
+// Day mask is 7 chars, index 0=Monday … 6=Sunday. JS getDay() is Sun=0, so shift.
+export const mondayIndex = (d = new Date()) => (d.getDay() + 6) % 7;
+
+export const activeToday = (days, d = new Date()) =>
+  !days || days.length !== 7 ? true : days[mondayIndex(d)] === '1';

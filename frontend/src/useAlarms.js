@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { getArrivals } from './api';
-import { isWithinWindow, minutesNow } from './alarmClock';
+import { activeToday, isWithinWindow, minutesNow } from './alarmClock';
 
 const TICK_MS = 20000;
 const ARRIVING_MIN = 2;
@@ -25,7 +25,7 @@ export default function useAlarms(schedules) {
     const tick = async () => {
       const nowMin = minutesNow();
       const due = schedules.filter(
-        (s) => s.enabled && isWithinWindow(nowMin, s.start_time, s.end_time)
+        (s) => s.enabled && activeToday(s.days) && isWithinWindow(nowMin, s.start_time, s.end_time)
       );
       if (!due.length) {
         if (alive) setActive([]);

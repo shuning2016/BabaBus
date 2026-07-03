@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { deleteSchedule, updateSchedule } from '../api';
 
+const DAY_LABELS = ['M', 'T', 'W', 'T', 'F', 'S', 'S']; // Mon..Sun
+
 /** One editable alarm: rename, adjust the daily window with native time
  *  pickers, pause/resume, delete — all committed straight to the server. */
 function AlarmRow({ s, live, onChanged }) {
@@ -11,6 +13,12 @@ function AlarmRow({ s, live, onChanged }) {
     const v = label.trim();
     if (v && v !== s.label) patch({ label: v });
     else setLabel(s.label);
+  };
+  const mask = s.days && s.days.length === 7 ? s.days : '1111111';
+  const toggleDay = (i) => {
+    const arr = mask.split('');
+    arr[i] = arr[i] === '1' ? '0' : '1';
+    patch({ days: arr.join('') });
   };
 
   return (
@@ -30,6 +38,13 @@ function AlarmRow({ s, live, onChanged }) {
         <input type="time" value={s.start_time} onChange={(e) => patch({ start_time: e.target.value })} />
         <span className="muted">to</span>
         <input type="time" value={s.end_time} onChange={(e) => patch({ end_time: e.target.value })} />
+      </div>
+      <div className="alarmdays">
+        {DAY_LABELS.map((d, i) => (
+          <button key={i} className={`day ${mask[i] === '1' ? 'on' : ''}`}
+            title={['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'][i]}
+            onClick={() => toggleDay(i)}>{d}</button>
+        ))}
       </div>
       <div className="alarmtimes">
         <span className="muted">Remind my phone every</span>

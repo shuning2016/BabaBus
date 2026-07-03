@@ -114,7 +114,11 @@ def init_db(path: Optional[str] = None) -> None:
         )""",
         path=path,
     )
-    for col, decl in (("remind_every", "INTEGER NOT NULL DEFAULT 4"), ("last_push", "INTEGER")):
+    for col, decl in (
+        ("remind_every", "INTEGER NOT NULL DEFAULT 4"),
+        ("last_push", "INTEGER"),
+        ("days", "TEXT NOT NULL DEFAULT '1111111'"),  # Mon..Sun mask
+    ):
         try:
             _run(f"ALTER TABLE schedules ADD COLUMN {col} {decl}", path=path)
         except sqlite3.OperationalError:
@@ -169,12 +173,13 @@ def add_schedule(
     end_time: str,
     label: str = "",
     remind_every: int = 4,
+    days: str = "1111111",
     path: Optional[str] = None,
 ) -> int:
     return _run(
-        "INSERT INTO schedules (stop_id, service_no, start_time, end_time, label, remind_every)"
-        " VALUES (?, ?, ?, ?, ?, ?)",
-        (stop_id, service_no, start_time, end_time, label, remind_every),
+        "INSERT INTO schedules (stop_id, service_no, start_time, end_time, label, remind_every, days)"
+        " VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (stop_id, service_no, start_time, end_time, label, remind_every, days),
         path=path,
     )["lastrowid"]
 

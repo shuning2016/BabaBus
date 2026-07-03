@@ -1,11 +1,15 @@
+from datetime import datetime, timedelta, timezone
+
 import pytest
 from fastapi.testclient import TestClient
 
 from app import db
-from app.alarms import within_window
+from app.alarms import active_on, within_window
 from app.config import settings
 from app.main import app
 from app.routers import push as push_router
+
+SGT = timezone(timedelta(hours=8))
 
 SECRET = "test-secret"
 ALL_DAY = {"start_time": "00:00", "end_time": "23:59"}
@@ -28,6 +32,39 @@ def test_within_window():
     assert within_window(420, "06:40", "07:00") is False   # 07:00 exclusive
     assert within_window(10, "23:30", "00:15") is True      # crosses midnight
     assert within_window(20, "23:30", "00:15") is False
+
+
+def test_active_on():
+    assert active_on("1111111", 0) is True
+    assert active_on("0111111", 0) is False   # Monday off
+    assert active_on("1111111", 6) is True     # Sunday
+    assert active_on("bad", 0) is False
+
+
+def test_tick_skips_day_that_is_off(monkeypatch):
+    sent = []
+    monkeypatch.setattr(push_router, "send_web_push", lambda sub, payload: sent.append(payload))
+    client.post("/api/push/subscribe", json={"endpoint": "e", "p256dh": "k", "auth": "a"})
+    today = datetime.now(SGT).weekday()
+    days_off_today = "".join("0" if i == today else "1" for i in range(7))
+    client.post("/api/schedules", json={
+        "stop_id": "01029", "service_no": "7", "label": "x", "days": days_off_today, **ALL_DAY,
+    })
+    body = client.post("/api/push/tick", params={"secret": SECRET}).json()
+    assert body["pushed"] == [] and sent == []
+
+
+def test_days_persist_and_validate():
+    created = client.post("/api/schedules", json={
+        "stop_id": "01029", "service_no": "7", "days": "1111100", **ALL_DAY,
+    }).json()
+    assert created["days"] == "1111100"
+    assert client.get("/api/schedules").json()["schedules"][0]["days"] == "1111100"
+    assert client.patch(f"/api/schedules/{created['id']}", json={"days": "1010101"}).json() == {"ok": True}
+    assert client.get("/api/schedules").json()["schedules"][0]["days"] == "1010101"
+    # bad masks rejected
+    assert client.post("/api/schedules", json={"stop_id": "01029", "service_no": "7", "days": "111", **ALL_DAY}).status_code == 422
+    assert client.patch(f"/api/schedules/{created['id']}", json={"days": "12345678"}).status_code == 422
 
 
 def test_subscribe_roundtrip():
