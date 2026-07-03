@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import httpx
 
@@ -7,6 +7,7 @@ from .models import Route, ServiceArrival, Stop
 
 BASE = "http://datamall2.mytransport.sg/ltaodataservice"
 PAGE_SIZE = 500
+SGT = timezone(timedelta(hours=8))
 
 
 class LTADataSource(DataSource):
@@ -59,6 +60,8 @@ class LTADataSource(DataSource):
                 if not bus.get("EstimatedArrival"):
                     continue
                 eta = datetime.fromisoformat(bus["EstimatedArrival"])
+                if eta.tzinfo is None:
+                    eta = eta.replace(tzinfo=SGT)
                 etas.append(max(0, round((eta - now).total_seconds() / 60)))
                 lat, lon = float(bus.get("Latitude") or 0), float(bus.get("Longitude") or 0)
                 if lat and lon:

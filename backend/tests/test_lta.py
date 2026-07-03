@@ -1,4 +1,3 @@
-import json
 from datetime import datetime, timedelta, timezone
 
 from app.datasource.lta import LTADataSource
