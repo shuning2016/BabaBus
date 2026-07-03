@@ -1,0 +1,28 @@
+const BASE = 'http://localhost:8000';
+
+async function j(path, opts) {
+  const res = await fetch(`${BASE}${path}`, opts);
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.detail || res.statusText);
+  }
+  return res.json();
+}
+
+const post = (body) => ({
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(body),
+});
+
+export const getHealth = () => j('/api/health');
+export const getNearby = (lat, lon) =>
+  j(`/api/stops/nearby?lat=${lat}&lon=${lon}&radius=800&limit=10`);
+export const getArrivals = (stopId) => j(`/api/stops/${stopId}/arrivals`);
+export const search = (q) => j(`/api/search?q=${encodeURIComponent(q)}`);
+export const getRoute = (serviceNo) => j(`/api/services/${serviceNo}/route`);
+export const getFavourites = () => j('/api/favourites');
+export const addFavourite = (body) => j('/api/favourites', post(body));
+export const renameFavourite = (id, name) =>
+  j(`/api/favourites/${id}`, { ...post({ custom_name: name }), method: 'PATCH' });
+export const deleteFavourite = (id) => j(`/api/favourites/${id}`, { method: 'DELETE' });
