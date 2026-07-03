@@ -1,4 +1,5 @@
-const BASE = 'http://localhost:8000';
+// Dev: separate uvicorn on :8000. Production (e.g. Vercel): same-origin /api.
+const BASE = import.meta.env.DEV ? 'http://localhost:8000' : '';
 
 async function j(path, opts) {
   const res = await fetch(`${BASE}${path}`, opts);

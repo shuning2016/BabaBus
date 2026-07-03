@@ -43,6 +43,20 @@ To go live, register free at https://datamall.lta.gov.sg, then:
 
 Note: in live mode the first route lookup downloads LTA's full route table (~30 s), then it's cached in memory.
 
+## Deploy to Vercel
+
+The repo is Vercel-ready: `vercel.json` builds the React frontend as static files
+and serves the FastAPI backend as a Python serverless function (`api/index.py`).
+Just import the repo at vercel.com — no settings needed.
+
+- To go live on Vercel, add an `LTA_ACCOUNT_KEY` environment variable in the
+  Vercel project settings.
+- Favourites use SQLite at `/tmp` on Vercel, so they reset between serverless
+  invocations — fine for playing around; a hosted DB (e.g. Turso) is the
+  future fix.
+- In live mode, route lookups can exceed the serverless time budget on the
+  first call (LTA's full route table download); demo mode is unaffected.
+
 ## Tests
 
     cd backend && .venv/bin/python -m pytest tests/ -v
