@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
-import { getHealth, getNearby, getRoute } from './api';
+import { addFavourite, deleteFavourite, getFavourites, getHealth, getNearby, getRoute, renameFavourite, search } from './api';
 import SearchBar from './components/SearchBar';
 import StopCard from './components/StopCard';
 import BusMap from './components/BusMap';
+import FavouritesPanel from './components/FavouritesPanel';
+import useWatch from './useWatch';
 
 const DEFAULT_CENTER = { lat: 1.2975, lon: 103.854 }; // Bugis — demo dataset area
 
@@ -11,10 +13,15 @@ export default function App() {
   const [stops, setStops] = useState([]);
   const [heading, setHeading] = useState('Nearby stops');
   const [mapTarget, setMapTarget] = useState(null);
+  const [favourites, setFavourites] = useState([]);
+  const { watched, toggleWatch } = useWatch();
+
+  const refreshFavs = () => getFavourites().then((d) => setFavourites(d.favourites));
 
   useEffect(() => {
     getHealth().then((h) => setMode(h.mode)).catch(() => setMode('offline'));
     loadNearby();
+    refreshFavs();
   }, []);
 
   const loadNearby = () => {
@@ -43,10 +50,21 @@ export default function App() {
       .then((route) => setMapTarget({ type: 'route', route }))
       .catch(() => setMapTarget(null));
 
-  // Placeholders — real implementations arrive in Task 11:
-  const onFavourite = () => {};
-  const watched = () => false;
-  const toggleWatch = () => {};
+  const onFavourite = (stopObj) => {
+    const name = window.prompt('Name this stop:', stopObj.name);
+    if (!name) return;
+    const group = window.confirm('OK = "Going out"  ·  Cancel = "Coming back"')
+      ? 'Going out' : 'Coming back';
+    addFavourite({ stop_id: stopObj.id, custom_name: name, group_name: group }).then(refreshFavs);
+  };
+
+  const openFavourite = (stopId) => {
+    const found = stops.find((s) => s.id === stopId);
+    if (found) { setStops([found]); setHeading('Favourite'); return; }
+    search(stopId).then((r) => {
+      if (r.stops.length) { setStops([r.stops[0]]); setHeading('Favourite'); }
+    });
+  };
 
   return (
     <div className="layout">
@@ -60,6 +78,15 @@ export default function App() {
       </header>
       <aside className="sidebar">
         <h4 style={{ color: 'var(--shopee-yellow)' }}>FAVOURITES</h4>
+        <FavouritesPanel
+          favourites={favourites}
+          onOpen={openFavourite}
+          onRename={(id) => {
+            const name = window.prompt('New name:');
+            if (name) renameFavourite(id, name).then(refreshFavs);
+          }}
+          onDelete={(id) => deleteFavourite(id).then(refreshFavs)}
+        />
       </aside>
       <main className="main">
         <h2 style={{ color: 'var(--navy)', fontSize: 17 }}>
