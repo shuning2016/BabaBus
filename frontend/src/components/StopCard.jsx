@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { getArrivals } from '../api';
-import CapacityBar from './CapacityBar';
+import ArrivalRow from './ArrivalRow';
 
 const POLL_MS = 15000;
 
@@ -26,50 +26,26 @@ export default function StopCard({
 
   return (
     <div className="card">
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+      <div className="cardhead">
         <div style={{ flex: 1, cursor: 'pointer' }} onClick={() => setOpen(!open)}>
-          <h3>{stop.name} <span className="muted">{stop.id} · {stop.road}</span></h3>
-          {stop.distance_m != null && <span className="muted">{stop.distance_m} m away</span>}
+          <h3>{stop.name}</h3>
+          <span className="muted">
+            {stop.id} · {stop.road}
+            {stop.distance_m != null && ` · ${stop.distance_m} m away`}
+          </span>
         </div>
-        <button className="plain" title="Add to favourites" onClick={() => onFavourite(stop)}>⭐</button>
-        <button className="plain" onClick={() => setOpen(!open)}>{open ? '▲' : '▼'}</button>
+        <button className="plain" title="Add stop to Favourites" onClick={() => onFavourite(stop)}>⭐</button>
+        <button className="plain caret" onClick={() => setOpen(!open)}>{open ? '▲' : '▼'}</button>
       </div>
       {open && error && <p className="stale">{error}</p>}
       {open && data && (
         <>
           {data.stale && <p className="stale">⚠ showing last known timings</p>}
           {data.services.map((svc) => (
-            <div className="row" key={svc.service_no}>
-              <button className="svc-chip" title="View route"
-                onClick={() => onShowRoute(svc.service_no)}>
-                {svc.service_no}
-              </button>
-              {svc.etas.map((eta, i) => (
-                <span key={i} className={`eta ${eta <= 1 ? 'now' : ''}`}
-                  title="Show bus on map"
-                  onClick={() => onShowBus(stop.id, svc.service_no, svc.bus_positions, data.stop_name)}>
-                  {eta <= 0 ? 'Arr' : `${eta} min`}
-                </span>
-              ))}
-              <CapacityBar load={svc.load} />
-              <span className="muted" title="Interval since previous bus">
-                every ~{svc.prev_interval_min} min
-              </span>
-              <button className="plain" title="Save this bus to My Buses"
-                style={{ marginLeft: 'auto' }}
-                onClick={() => onFavouriteBus(stop, svc.service_no)}>
-                ⭐
-              </button>
-              <button className="plain" title="Notify me when arriving"
-                style={{ opacity: watched(stop.id, svc.service_no) ? 1 : 0.4 }}
-                onClick={() => toggleWatch(stop.id, svc.service_no)}>
-                🔔
-              </button>
-              <button className="plain" title="Watch this bus at set times every day"
-                onClick={() => onCreateAlarm(stop, svc.service_no)}>
-                ⏰
-              </button>
-            </div>
+            <ArrivalRow key={svc.service_no} svc={svc} stopId={stop.id} stopName={data.stop_name}
+              onShowBus={onShowBus} onShowRoute={onShowRoute}
+              onFavouriteBus={onFavouriteBus} onCreateAlarm={onCreateAlarm}
+              watched={watched} toggleWatch={toggleWatch} />
           ))}
         </>
       )}

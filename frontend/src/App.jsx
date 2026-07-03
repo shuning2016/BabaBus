@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { addFavourite, addSchedule, deleteFavourite, getArrivals, getFavourites, getHealth, getNearby, getRoute, getSchedules, renameFavourite, search } from './api';
+import { addFavourite, addSchedule, deleteFavourite, getArrivals, getFavourites, getHealth, getNearby, getRoute, getSchedules, renameFavourite } from './api';
 import SearchBar from './components/SearchBar';
 import StopCard from './components/StopCard';
 import BusMap from './components/BusMap';
@@ -9,16 +9,10 @@ import useWatch from './useWatch';
 import useAlarms from './useAlarms';
 import useInstallPrompt from './useInstallPrompt';
 import { HHMM_RE } from './alarmClock';
+import { approxMetres, assignBusIds } from './geo';
 
 const DEFAULT_CENTER = { lat: 1.2975, lon: 103.854 }; // Bugis — demo dataset area
 const AUTOWATCH_KEY = 'bababus-autowatch';
-
-// Approximate metres between two lat/lon points (fine at city scale)
-const approxMetres = (a, b) => {
-  const dLat = (a[0] - b[0]) * 111320;
-  const dLon = (a[1] - b[1]) * 111320 * Math.cos((a[0] * Math.PI) / 180);
-  return Math.sqrt(dLat * dLat + dLon * dLon);
-};
 
 const autoWatchStore = {
   read: () => new Set(JSON.parse(localStorage.getItem(AUTOWATCH_KEY) || '[]')),
@@ -29,20 +23,27 @@ const autoWatchStore = {
   },
 };
 
+const TABS = [
+  { id: 'fav', icon: '⭐', label: 'Favourite' },
+  { id: 'map', icon: '🗺️', label: 'Map' },
+  { id: 'nearby', icon: '📍', label: 'Nearby' },
+];
+
 export default function App() {
   const [mode, setMode] = useState('...');
   const [stops, setStops] = useState([]);
   const [heading, setHeading] = useState('Nearby stops');
   const [mapTarget, setMapTarget] = useState(null);
-  const [exploreCenter, setExploreCenter] = useState(null); // [lat, lon] of a user-picked place
+  const [exploreCenter, setExploreCenter] = useState(null);
   const [favourites, setFavourites] = useState([]);
-  const [areaBuses, setAreaBuses] = useState([]); // live buses near the explore view
+  const [areaBuses, setAreaBuses] = useState([]);
   const [schedules, setSchedules] = useState([]);
-  const [tab, setTab] = useState('list'); // mobile: which pane is visible
+  const [tab, setTab] = useState('fav'); // default page = Favourite
   const { watched, toggleWatch } = useWatch();
   const activeAlarms = useAlarms(schedules);
   const { canInstall, install } = useInstallPrompt();
-  const lastLoad = useRef(null); // [lat, lon] of the last nearby fetch
+  const lastLoad = useRef(null);
+  const prevBuses = useRef([]);
 
   const refreshFavs = () => getFavourites().then((d) => setFavourites(d.favourites));
   const refreshSchedules = () => getSchedules().then((d) => setSchedules(d.schedules));
@@ -55,10 +56,10 @@ export default function App() {
   }, []);
 
   const loadNearby = () => {
-    const useCenter = (lat, lon) =>
+    const loadAt = (lat, lon) =>
       getNearby(lat, lon).then((d) => {
-        if (d.stops.length === 0 && (lat !== DEFAULT_CENTER.lat)) {
-          return useCenter(DEFAULT_CENTER.lat, DEFAULT_CENTER.lon); // demo data fallback
+        if (d.stops.length === 0 && lat !== DEFAULT_CENTER.lat) {
+          return loadAt(DEFAULT_CENTER.lat, DEFAULT_CENTER.lon);
         }
         lastLoad.current = [lat, lon];
         setExploreCenter([lat, lon]);
@@ -66,16 +67,19 @@ export default function App() {
         setHeading('Nearby stops');
         return null;
       });
-    if (!navigator.geolocation) return useCenter(DEFAULT_CENTER.lat, DEFAULT_CENTER.lon);
+    if (!navigator.geolocation) return loadAt(DEFAULT_CENTER.lat, DEFAULT_CENTER.lon);
     navigator.geolocation.getCurrentPosition(
-      (pos) => useCenter(pos.coords.latitude, pos.coords.longitude),
-      () => useCenter(DEFAULT_CENTER.lat, DEFAULT_CENTER.lon)
+      (pos) => loadAt(pos.coords.latitude, pos.coords.longitude),
+      () => loadAt(DEFAULT_CENTER.lat, DEFAULT_CENTER.lon)
     );
     return null;
   };
 
+  const showOnMap = (t) => { setMapTarget(t); setTab('map'); };
   const onShowBus = (stopId, serviceNo, positions, stopName) =>
-    setMapTarget({ type: 'bus', stopId, serviceNo, positions, stopName });
+    showOnMap({ type: 'bus', stopId, serviceNo, positions, stopName });
+  const onShowRoute = (serviceNo) =>
+    getRoute(serviceNo).then((route) => showOnMap({ type: 'route', route })).catch(() => {});
 
   useEffect(() => {
     if (!mapTarget || mapTarget.type !== 'bus') return undefined;
@@ -96,11 +100,6 @@ export default function App() {
     return () => clearInterval(timer);
   }, [mapTarget?.type, mapTarget?.stopId, mapTarget?.serviceNo]);
 
-  const onShowRoute = (serviceNo) =>
-    getRoute(serviceNo)
-      .then((route) => setMapTarget({ type: 'route', route }))
-      .catch(() => setMapTarget(null));
-
   const onPickPoint = (lat, lon) => {
     setExploreCenter([lat, lon]);
     setHeading('Loading stops…');
@@ -112,9 +111,9 @@ export default function App() {
   };
 
   const onPickPlace = (place) => {
-    setMapTarget(null); // jump back to the explore map
+    setMapTarget(null);
     setExploreCenter([place.lat, place.lon]);
-    setTab('map'); // on mobile, show the pin landing immediately
+    setTab('map');
     setHeading(`Loading stops near ${place.label}…`);
     lastLoad.current = [place.lat, place.lon];
     getNearby(place.lat, place.lon).then((d) => {
@@ -123,13 +122,9 @@ export default function App() {
     });
   };
 
-  // Live buses around the explore view: pull arrivals for the visible stops,
-  // plot every reported bus position, refresh on the arrivals cadence.
+  // Live buses around the explore view, with stable ids so the map can animate them.
   useEffect(() => {
-    if (mapTarget || stops.length === 0) {
-      setAreaBuses([]);
-      return undefined;
-    }
+    if (mapTarget || stops.length === 0) { setAreaBuses([]); prevBuses.current = []; return undefined; }
     let alive = true;
     const load = () =>
       Promise.all(
@@ -144,19 +139,19 @@ export default function App() {
         const seen = new Map();
         lists.flat().forEach((b) => {
           const key = `${b.service_no}:${b.lat.toFixed(3)}:${b.lon.toFixed(3)}`;
-          // keep buses roughly within the loaded area so far-off ones don't clutter
           if (!seen.has(key) && (!lastLoad.current || approxMetres([b.lat, b.lon], lastLoad.current) < 2000)) {
             seen.set(key, b);
           }
         });
-        setAreaBuses([...seen.values()]);
+        const withIds = assignBusIds(prevBuses.current, [...seen.values()]);
+        prevBuses.current = withIds;
+        setAreaBuses(withIds);
       });
     load();
     const timer = setInterval(load, 15000);
     return () => { alive = false; clearInterval(timer); };
   }, [mapTarget, stops]);
 
-  // Panning the explore map loads the stops around the new view automatically.
   const onMapMove = (lat, lon) => {
     if (lastLoad.current && approxMetres([lat, lon], lastLoad.current) < 200) return;
     lastLoad.current = [lat, lon];
@@ -169,17 +164,14 @@ export default function App() {
   const onFavourite = (stopObj) => {
     const name = window.prompt('Name this stop:', stopObj.name);
     if (!name) return;
-    const group = window.confirm('OK = "Going out"  ·  Cancel = "Coming back"')
-      ? 'Going out' : 'Coming back';
+    const group = window.confirm('OK = "Going out"  ·  Cancel = "Coming back"') ? 'Going out' : 'Coming back';
     addFavourite({ stop_id: stopObj.id, custom_name: name, group_name: group }).then(refreshFavs);
   };
 
   const onFavouriteBus = (stopObj, serviceNo) => {
     const name = window.prompt('Name this bus:', `Bus ${serviceNo} @ ${stopObj.name}`);
     if (!name) return;
-    addFavourite({
-      stop_id: stopObj.id, custom_name: name, group_name: 'My Buses', service_no: serviceNo,
-    }).then(refreshFavs);
+    addFavourite({ stop_id: stopObj.id, custom_name: name, group_name: 'My Buses', service_no: serviceNo }).then(refreshFavs);
   };
 
   const askTime = (message, fallback) => {
@@ -187,7 +179,7 @@ export default function App() {
       const t = window.prompt(message, fallback);
       if (t === null) return null;
       if (HHMM_RE.test(t.trim())) return t.trim();
-      fallback = t; // let the user correct their typo
+      fallback = t;
     }
   };
 
@@ -196,24 +188,8 @@ export default function App() {
     if (!start) return;
     const end = askTime('until (HH:MM):', '07:00');
     if (!end) return;
-    if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
-      Notification.requestPermission();
-    }
-    addSchedule({
-      stop_id: stopObj.id, service_no: serviceNo,
-      start_time: start, end_time: end,
-      label: `${serviceNo} @ ${stopObj.name}`,
-    }).then(refreshSchedules);
-  };
-
-  const openFavouriteBus = (fav) => {
-    openFavourite(fav.stop_id);
-    getArrivals(fav.stop_id)
-      .then((d) => {
-        const svc = d.services.find((s) => s.service_no === fav.service_no);
-        if (svc) onShowBus(fav.stop_id, fav.service_no, svc.bus_positions, d.stop_name);
-      })
-      .catch(() => {});
+    if (typeof Notification !== 'undefined' && Notification.permission === 'default') Notification.requestPermission();
+    addSchedule({ stop_id: stopObj.id, service_no: serviceNo, start_time: start, end_time: end, label: `${serviceNo} @ ${stopObj.name}` }).then(refreshSchedules);
   };
 
   const toggleAutoWatch = (fav) => {
@@ -221,105 +197,85 @@ export default function App() {
     toggleWatch(fav.stop_id, fav.service_no);
   };
 
-  // Re-arm persisted auto-watches whenever the favourites list loads
   useEffect(() => {
     const stored = autoWatchStore.read();
     favourites
       .filter((f) => f.service_no && stored.has(`${f.stop_id}:${f.service_no}`))
-      .forEach((f) => {
-        if (!watched(f.stop_id, f.service_no)) toggleWatch(f.stop_id, f.service_no);
-      });
+      .forEach((f) => { if (!watched(f.stop_id, f.service_no)) toggleWatch(f.stop_id, f.service_no); });
   }, [favourites]);
 
-  const openFavourite = (stopId) => {
-    const found = stops.find((s) => s.id === stopId);
-    if (found) { setStops([found]); setHeading('Favourite'); return; }
-    search(stopId).then((r) => {
-      if (r.stops.length) { setStops([r.stops[0]]); setHeading('Favourite'); }
-    });
+  const renameFav = (id) => {
+    const name = window.prompt('New name:');
+    if (name) renameFavourite(id, name).then(refreshFavs);
   };
 
+  const AlarmBanners = () => activeAlarms.map(({ schedule: s, stopName, etas }) => (
+    <div className="alarmbanner" key={s.id}>
+      ⏰ Bus <strong>{s.service_no}</strong> at {stopName}:{' '}
+      {etas.length ? <strong>{etas[0] <= 0 ? 'arriving now' : `${etas[0]} min`}</strong> : 'no live timing yet'}
+      {etas.length > 1 && <span> · then {etas.slice(1).map((e) => `${e} min`).join(', ')}</span>}
+    </div>
+  ));
+
   return (
-    <div className={`layout tab-${tab}`}>
+    <div className={`app tab-${tab}`}>
       <header className="header">
         <h1>🚌 BabaBus</h1>
         <SearchBar
-          onPickStop={(s) => { setStops([s]); setHeading('Search result'); }}
+          onPickStop={(s) => { setStops([s]); setHeading('Search result'); setTab('nearby'); }}
           onPickService={onShowRoute}
           onPickPlace={onPickPlace}
         />
-        {canInstall && (
-          <button className="installbtn" onClick={install}>⬇ Install</button>
-        )}
-        <span className="badge">{mode.toUpperCase()} MODE</span>
+        {canInstall && <button className="installbtn" onClick={install}>⬇ Install</button>}
+        <span className={`badge ${mode}`}>{mode.toUpperCase()}</span>
       </header>
-      <aside className="sidebar">
-        <h4 style={{ color: 'var(--shopee-yellow)' }}>BUS ALARMS</h4>
-        <AlarmsPanel schedules={schedules} active={activeAlarms} onChanged={refreshSchedules} />
-        <h4 style={{ color: 'var(--shopee-yellow)' }}>FAVOURITES</h4>
-        <FavouritesPanel
-          favourites={favourites}
-          onOpen={openFavourite}
-          onOpenBus={openFavouriteBus}
-          onRename={(id) => {
-            const name = window.prompt('New name:');
-            if (name) renameFavourite(id, name).then(refreshFavs);
-          }}
-          onDelete={(id) => deleteFavourite(id).then(refreshFavs)}
-          watched={watched}
-          toggleWatch={toggleAutoWatch}
-        />
-      </aside>
-      <main className="main">
-        {activeAlarms.map(({ schedule: s, stopName, etas }) => (
-          <div className="alarmbanner" key={s.id}>
-            ⏰ Bus <strong>{s.service_no}</strong> at {stopName}:{' '}
-            {etas.length
-              ? <strong>{etas[0] <= 0 ? 'arriving now' : `${etas[0]} min`}</strong>
-              : 'no live timing yet'}
-            {etas.length > 1 && <span> · then {etas.slice(1).map((e) => `${e} min`).join(', ')}</span>}
-          </div>
-        ))}
-        <h2 style={{ color: 'var(--navy)', fontSize: 17 }}>
-          {heading}{' '}
-          <button className="plain" title="Refresh nearby" onClick={loadNearby}>📍</button>
-        </h2>
-        {stops.map((s) => (
-          <StopCard key={s.id} stop={s} onShowBus={onShowBus} onShowRoute={onShowRoute}
-            onFavourite={onFavourite} onFavouriteBus={onFavouriteBus} onCreateAlarm={onCreateAlarm}
-            watched={watched} toggleWatch={toggleWatch} />
-        ))}
-      </main>
-      <section className="mappane">
-        {!mapTarget && (
-          <div className="maphint">🖱 Click the map to explore stops there · tap a marker for live arrivals</div>
-        )}
-        {mapTarget && (
-          <button className="mapclose" title="Back to explore map" onClick={() => setMapTarget(null)}>
-            ✕ explore
-          </button>
-        )}
-        <BusMap target={mapTarget} stops={stops} buses={areaBuses} onPickPoint={onPickPoint} onMapMove={onMapMove} center={exploreCenter} />
-      </section>
+
       <nav className="tabbar">
-        <button className={tab === 'list' ? 'on' : ''} onClick={() => setTab('list')}>
-          🚏<span>Nearby</span>
-        </button>
-        <button className={tab === 'map' ? 'on' : ''} onClick={() => setTab('map')}>
-          🗺️<span>Map</span>
-        </button>
-        <button className={tab === 'saved' ? 'on' : ''} onClick={() => setTab('saved')}>
-          ⭐<span>Saved</span>
-        </button>
+        {TABS.map((t) => (
+          <button key={t.id} className={tab === t.id ? 'on' : ''} onClick={() => setTab(t.id)}>
+            <span className="ti">{t.icon}</span><span className="tl">{t.label}</span>
+          </button>
+        ))}
       </nav>
-      <footer className="footer">
-        <span className="dot" />
-        {mode === 'demo'
-          ? 'DEMO MODE — simulated buses over real Singapore route geometry. Add your LTA DataMall key in backend/.env to go live.'
-          : mode === 'live'
-            ? 'LIVE MODE — real-time data from LTA DataMall.'
-            : 'Backend offline — start the API server on port 8000.'}
-      </footer>
+
+      <div className="content">
+        <section className="pane pane-fav">
+          <AlarmBanners />
+          {schedules.length > 0 && (
+            <div className="favsection">
+              <h4 className="sectiontitle">Bus Alarms</h4>
+              <AlarmsPanel schedules={schedules} active={activeAlarms} onChanged={refreshSchedules} />
+            </div>
+          )}
+          <FavouritesPanel
+            favourites={favourites}
+            onShowBus={onShowBus} onShowRoute={onShowRoute} onCreateAlarm={onCreateAlarm}
+            onRename={renameFav} onDelete={(id) => deleteFavourite(id).then(refreshFavs)}
+            watched={watched} toggleWatch={toggleAutoWatch}
+          />
+        </section>
+
+        <section className="pane pane-map">
+          {mapTarget && (
+            <button className="mapclose" onClick={() => setMapTarget(null)}>✕ back to explore</button>
+          )}
+          <BusMap target={mapTarget} stops={stops} buses={areaBuses} active={tab === 'map'}
+            onPickPoint={onPickPoint} onMapMove={onMapMove} center={exploreCenter} />
+        </section>
+
+        <section className="pane pane-nearby">
+          <AlarmBanners />
+          <div className="paneheader">
+            <h2>{heading}</h2>
+            <button className="pill" onClick={loadNearby}>📍 Near me</button>
+          </div>
+          {stops.map((s) => (
+            <StopCard key={s.id} stop={s} onShowBus={onShowBus} onShowRoute={onShowRoute}
+              onFavourite={onFavourite} onFavouriteBus={onFavouriteBus} onCreateAlarm={onCreateAlarm}
+              watched={watched} toggleWatch={toggleWatch} />
+          ))}
+        </section>
+      </div>
     </div>
   );
 }

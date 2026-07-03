@@ -4,13 +4,7 @@ import { deleteSchedule, updateSchedule } from '../api';
 export default function AlarmsPanel({ schedules, active, onChanged }) {
   const liveById = new Map(active.map((a) => [a.schedule.id, a]));
 
-  if (!schedules.length) {
-    return (
-      <p style={{ fontSize: 12, color: '#c7d0e0' }}>
-        No alarms yet — open a stop and tap ⏰ on a bus to watch it at set times.
-      </p>
-    );
-  }
+  if (!schedules.length) return null;
 
   return (
     <div>
@@ -30,10 +24,10 @@ export default function AlarmsPanel({ schedules, active, onChanged }) {
                 🗑
               </button>
             </div>
-            <div style={{ fontSize: 11, color: '#c7d0e0' }}>
+            <div style={{ fontSize: 11, color: '#6B7A99' }}>
               {s.start_time}–{s.end_time} daily
               {live && (live.etas.length
-                ? <strong style={{ color: 'var(--shopee-yellow)' }}>
+                ? <strong style={{ color: 'var(--shopee-orange)' }}>
                     {' '}· next {live.etas[0] <= 0 ? 'now' : `${live.etas[0]} min`}
                   </strong>
                 : ' · no live timing')}
