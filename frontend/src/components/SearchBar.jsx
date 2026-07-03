@@ -1,17 +1,20 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { search } from '../api';
 
 export default function SearchBar({ onPickStop, onPickService }) {
   const [q, setQ] = useState('');
   const [results, setResults] = useState(null);
+  const seq = useRef(0);
 
   const run = async (value) => {
     setQ(value);
     if (value.trim().length < 1) return setResults(null);
+    const mine = ++seq.current;
     try {
-      setResults(await search(value.trim()));
+      const r = await search(value.trim());
+      if (seq.current === mine) setResults(r);
     } catch {
-      setResults(null);
+      if (seq.current === mine) setResults(null);
     }
   };
 
