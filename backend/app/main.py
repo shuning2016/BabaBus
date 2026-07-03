@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .config import settings
 from . import db
-from .routers import favourites, search, services, stops
+from .routers import favourites, schedules, search, services, stops
 
 app = FastAPI(title="BabaBus API")
 app.add_middleware(
@@ -18,6 +18,7 @@ app.include_router(stops.router)
 app.include_router(search.router)
 app.include_router(services.router)
 app.include_router(favourites.router)
+app.include_router(schedules.router)
 
 
 @app.get("/api/health")
