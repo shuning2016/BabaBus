@@ -50,3 +50,25 @@ def test_route_endpoint():
     assert [s["id"] for s in body["stops"]][0] == "01012"
     assert len(body["polyline"]) == 5
     assert client.get("/api/services/999/route").status_code == 404
+
+
+def test_search_falls_back_to_geocode_when_no_local_match(monkeypatch):
+    from app.routers import search as search_module
+
+    monkeypatch.setattr(
+        search_module,
+        "_onemap_geocode",
+        lambda q: {"lat": 1.29685, "lon": 103.85254, "label": "RAFFLES HOTEL"},
+    )
+    body = client.get("/api/search", params={"q": "188719"}).json()
+    assert body["geocoded"]["label"] == "RAFFLES HOTEL"
+    assert body["services"] == []
+    assert body["stops"][0]["id"] == "01012"  # nearest stop to geocoded point
+
+
+def test_search_geocode_failure_returns_empty(monkeypatch):
+    from app.routers import search as search_module
+
+    monkeypatch.setattr(search_module, "_onemap_geocode", lambda q: None)
+    body = client.get("/api/search", params={"q": "zzzznope"}).json()
+    assert body == {"services": [], "stops": [], "geocoded": None}

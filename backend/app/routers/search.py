@@ -16,7 +16,7 @@ def search(q: str):
     stops = [
         s
         for s in ds.get_stops()
-        if ql in s.name.lower() or ql in s.road.lower() or s.id.startswith(q.strip())
+        if ql in s.name.lower() or ql in s.road.lower() or s.id.startswith(ql)
     ]
     geocoded = None
     if not stops and not services:
