@@ -1,48 +1,123 @@
+"""Persistence for favourites and alarm schedules.
+
+Local SQLite by default; when TURSO_URL/TURSO_TOKEN are set, the same
+statements run against Turso (libSQL over HTTP). Vercel's filesystem is
+ephemeral per serverless instance, so the hosted DB is what makes saved
+data survive refreshes there.
+"""
 import contextlib
 import sqlite3
-from typing import Optional
+from typing import Any, Optional
+
+import httpx
 
 from .config import settings
 
+_turso_client: Optional[httpx.Client] = None
 
-def _conn(path: Optional[str] = None) -> sqlite3.Connection:
-    conn = sqlite3.connect(path or settings.db_path)
-    conn.row_factory = sqlite3.Row
-    return conn
+
+def _turso() -> httpx.Client:
+    global _turso_client
+    if _turso_client is None:
+        _turso_client = httpx.Client(
+            base_url=settings.turso_url.replace("libsql://", "https://"),
+            headers={"Authorization": f"Bearer {settings.turso_token}"},
+            timeout=10,
+        )
+    return _turso_client
+
+
+def _encode(v: Any) -> dict:
+    if v is None:
+        return {"type": "null"}
+    if isinstance(v, bool):
+        return {"type": "integer", "value": str(int(v))}
+    if isinstance(v, int):
+        return {"type": "integer", "value": str(v)}
+    if isinstance(v, float):
+        return {"type": "float", "value": v}
+    return {"type": "text", "value": str(v)}
+
+
+def _decode(cell: dict) -> Any:
+    t = cell["type"]
+    if t == "null":
+        return None
+    if t == "integer":
+        return int(cell["value"])
+    if t == "float":
+        return float(cell["value"])
+    return cell["value"]
+
+
+def _turso_run(sql: str, args: tuple) -> dict:
+    body = {
+        "requests": [
+            {"type": "execute", "stmt": {"sql": sql, "args": [_encode(a) for a in args]}},
+            {"type": "close"},
+        ]
+    }
+    res = _turso().post("/v2/pipeline", json=body)
+    res.raise_for_status()
+    first = res.json()["results"][0]
+    if first["type"] == "error":
+        raise sqlite3.OperationalError(first["error"]["message"])
+    return first["response"]["result"]
+
+
+def _run(sql: str, args: tuple = (), path: Optional[str] = None) -> dict:
+    """Execute one statement; returns {"rows": [dict], "rowcount", "lastrowid"}."""
+    if settings.turso_url and path is None:
+        r = _turso_run(sql, args)
+        cols = [c["name"] for c in r["cols"]]
+        rows = [dict(zip(cols, map(_decode, row))) for row in r["rows"]]
+        last = r.get("last_insert_rowid")
+        return {
+            "rows": rows,
+            "rowcount": r.get("affected_row_count", 0),
+            "lastrowid": int(last) if last is not None else None,
+        }
+    with contextlib.closing(sqlite3.connect(path or settings.db_path)) as c, c:
+        c.row_factory = sqlite3.Row
+        cur = c.execute(sql, args)
+        return {
+            "rows": [dict(row) for row in cur.fetchall()],
+            "rowcount": cur.rowcount,
+            "lastrowid": cur.lastrowid,
+        }
 
 
 def init_db(path: Optional[str] = None) -> None:
-    with contextlib.closing(_conn(path)) as c, c:
-        c.execute(
-            """CREATE TABLE IF NOT EXISTS favourites (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                stop_id TEXT NOT NULL,
-                custom_name TEXT NOT NULL,
-                group_name TEXT NOT NULL DEFAULT 'Going out',
-                service_no TEXT
-            )"""
-        )
-        try:  # migrate pre-existing databases created before service_no
-            c.execute("ALTER TABLE favourites ADD COLUMN service_no TEXT")
-        except sqlite3.OperationalError:
-            pass
-        c.execute(
-            """CREATE TABLE IF NOT EXISTS schedules (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                stop_id TEXT NOT NULL,
-                service_no TEXT NOT NULL,
-                start_time TEXT NOT NULL,
-                end_time TEXT NOT NULL,
-                label TEXT NOT NULL DEFAULT '',
-                enabled INTEGER NOT NULL DEFAULT 1
-            )"""
-        )
+    _run(
+        """CREATE TABLE IF NOT EXISTS favourites (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            stop_id TEXT NOT NULL,
+            custom_name TEXT NOT NULL,
+            group_name TEXT NOT NULL DEFAULT 'Going out',
+            service_no TEXT
+        )""",
+        path=path,
+    )
+    try:  # migrate pre-existing databases created before service_no
+        _run("ALTER TABLE favourites ADD COLUMN service_no TEXT", path=path)
+    except sqlite3.OperationalError:
+        pass
+    _run(
+        """CREATE TABLE IF NOT EXISTS schedules (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            stop_id TEXT NOT NULL,
+            service_no TEXT NOT NULL,
+            start_time TEXT NOT NULL,
+            end_time TEXT NOT NULL,
+            label TEXT NOT NULL DEFAULT '',
+            enabled INTEGER NOT NULL DEFAULT 1
+        )""",
+        path=path,
+    )
 
 
 def list_favourites(path: Optional[str] = None) -> list[dict]:
-    with contextlib.closing(_conn(path)) as c, c:
-        rows = c.execute("SELECT * FROM favourites ORDER BY group_name, id").fetchall()
-        return [dict(r) for r in rows]
+    return _run("SELECT * FROM favourites ORDER BY group_name, id", path=path)["rows"]
 
 
 def add_favourite(
@@ -52,31 +127,26 @@ def add_favourite(
     service_no: Optional[str] = None,
     path: Optional[str] = None,
 ) -> int:
-    with contextlib.closing(_conn(path)) as c, c:
-        cur = c.execute(
-            "INSERT INTO favourites (stop_id, custom_name, group_name, service_no) VALUES (?, ?, ?, ?)",
-            (stop_id, custom_name, group_name, service_no),
-        )
-        return cur.lastrowid
+    return _run(
+        "INSERT INTO favourites (stop_id, custom_name, group_name, service_no) VALUES (?, ?, ?, ?)",
+        (stop_id, custom_name, group_name, service_no),
+        path=path,
+    )["lastrowid"]
 
 
 def delete_favourite(fav_id: int, path: Optional[str] = None) -> bool:
-    with contextlib.closing(_conn(path)) as c, c:
-        return c.execute("DELETE FROM favourites WHERE id = ?", (fav_id,)).rowcount > 0
+    return _run("DELETE FROM favourites WHERE id = ?", (fav_id,), path=path)["rowcount"] > 0
 
 
 def rename_favourite(fav_id: int, custom_name: str, path: Optional[str] = None) -> bool:
-    with contextlib.closing(_conn(path)) as c, c:
-        cur = c.execute(
-            "UPDATE favourites SET custom_name = ? WHERE id = ?", (custom_name, fav_id)
-        )
-        return cur.rowcount > 0
+    return _run(
+        "UPDATE favourites SET custom_name = ? WHERE id = ?", (custom_name, fav_id), path=path
+    )["rowcount"] > 0
 
 
 def list_schedules(path: Optional[str] = None) -> list[dict]:
-    with contextlib.closing(_conn(path)) as c, c:
-        rows = c.execute("SELECT * FROM schedules ORDER BY start_time, id").fetchall()
-        return [{**dict(r), "enabled": bool(r["enabled"])} for r in rows]
+    rows = _run("SELECT * FROM schedules ORDER BY start_time, id", path=path)["rows"]
+    return [{**r, "enabled": bool(r["enabled"])} for r in rows]
 
 
 def add_schedule(
@@ -87,26 +157,24 @@ def add_schedule(
     label: str = "",
     path: Optional[str] = None,
 ) -> int:
-    with contextlib.closing(_conn(path)) as c, c:
-        cur = c.execute(
-            "INSERT INTO schedules (stop_id, service_no, start_time, end_time, label)"
-            " VALUES (?, ?, ?, ?, ?)",
-            (stop_id, service_no, start_time, end_time, label),
-        )
-        return cur.lastrowid
+    return _run(
+        "INSERT INTO schedules (stop_id, service_no, start_time, end_time, label)"
+        " VALUES (?, ?, ?, ?, ?)",
+        (stop_id, service_no, start_time, end_time, label),
+        path=path,
+    )["lastrowid"]
 
 
 def update_schedule(schedule_id: int, fields: dict, path: Optional[str] = None) -> bool:
     if not fields:
         return False
     cols = ", ".join(f"{k} = ?" for k in fields)
-    with contextlib.closing(_conn(path)) as c, c:
-        cur = c.execute(
-            f"UPDATE schedules SET {cols} WHERE id = ?", (*fields.values(), schedule_id)
-        )
-        return cur.rowcount > 0
+    return _run(
+        f"UPDATE schedules SET {cols} WHERE id = ?",
+        (*fields.values(), schedule_id),
+        path=path,
+    )["rowcount"] > 0
 
 
 def delete_schedule(schedule_id: int, path: Optional[str] = None) -> bool:
-    with contextlib.closing(_conn(path)) as c, c:
-        return c.execute("DELETE FROM schedules WHERE id = ?", (schedule_id,)).rowcount > 0
+    return _run("DELETE FROM schedules WHERE id = ?", (schedule_id,), path=path)["rowcount"] > 0
