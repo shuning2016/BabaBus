@@ -67,7 +67,8 @@ PAYLOADS = {
 
 
 def make_source():
-    return LTADataSource("test-key", client=FakeClient(PAYLOADS))
+    # snapshot_dir=None exercises the live download path the snapshots replace
+    return LTADataSource("test-key", client=FakeClient(PAYLOADS), snapshot_dir=None)
 
 
 def test_stops_mapped_and_memoized():
@@ -81,6 +82,27 @@ def test_route_uses_direction_1_in_sequence():
     route = make_source().get_route("7")
     assert [s.id for s in route.stops] == ["01012", "01013"]
     assert make_source().get_route("999") is None
+
+
+def test_snapshots_short_circuit_the_download(tmp_path):
+    import json
+
+    tmp_path.joinpath("lta_stops.json").write_text(json.dumps(
+        [{"id": "99999", "name": "Snap Stop", "road": "Snap Rd", "lat": 1.3, "lon": 103.8}]))
+    tmp_path.joinpath("lta_routes.json").write_text(json.dumps({"7": ["99999"]}))
+
+    class ExplodingClient:
+        def get(self, url, params=None):
+            raise AssertionError(f"snapshot should have prevented HTTP call to {url}")
+
+    src = LTADataSource("test-key", client=ExplodingClient(), snapshot_dir=tmp_path)
+    assert src.get_stops()[0].name == "Snap Stop"
+    assert src.get_route("7").stops[0].id == "99999"
+
+
+def test_missing_snapshot_dir_falls_back_to_api(tmp_path):
+    src = LTADataSource("test-key", client=FakeClient(PAYLOADS), snapshot_dir=tmp_path)
+    assert src.get_stops()[0].id == "01012"  # empty dir -> downloads via client
 
 
 def test_arrivals_mapping():

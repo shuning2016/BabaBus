@@ -7,6 +7,7 @@ import FavouritesPanel from './components/FavouritesPanel';
 import AlarmsPanel from './components/AlarmsPanel';
 import useWatch from './useWatch';
 import useAlarms from './useAlarms';
+import useInstallPrompt from './useInstallPrompt';
 import { HHMM_RE } from './alarmClock';
 
 const DEFAULT_CENTER = { lat: 1.2975, lon: 103.854 }; // Bugis — demo dataset area
@@ -40,6 +41,7 @@ export default function App() {
   const [tab, setTab] = useState('list'); // mobile: which pane is visible
   const { watched, toggleWatch } = useWatch();
   const activeAlarms = useAlarms(schedules);
+  const { canInstall, install } = useInstallPrompt();
   const lastLoad = useRef(null); // [lat, lon] of the last nearby fetch
 
   const refreshFavs = () => getFavourites().then((d) => setFavourites(d.favourites));
@@ -101,6 +103,7 @@ export default function App() {
 
   const onPickPoint = (lat, lon) => {
     setExploreCenter([lat, lon]);
+    setHeading('Loading stops…');
     lastLoad.current = [lat, lon];
     return getNearby(lat, lon).then((d) => {
       setStops(d.stops);
@@ -111,6 +114,8 @@ export default function App() {
   const onPickPlace = (place) => {
     setMapTarget(null); // jump back to the explore map
     setExploreCenter([place.lat, place.lon]);
+    setTab('map'); // on mobile, show the pin landing immediately
+    setHeading(`Loading stops near ${place.label}…`);
     lastLoad.current = [place.lat, place.lon];
     getNearby(place.lat, place.lon).then((d) => {
       setStops(d.stops);
@@ -243,6 +248,9 @@ export default function App() {
           onPickService={onShowRoute}
           onPickPlace={onPickPlace}
         />
+        {canInstall && (
+          <button className="installbtn" onClick={install}>⬇ Install</button>
+        )}
         <span className="badge">{mode.toUpperCase()} MODE</span>
       </header>
       <aside className="sidebar">
