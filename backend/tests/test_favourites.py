@@ -46,3 +46,21 @@ def test_group_defaults_to_going_out():
 def test_missing_favourite_404():
     assert client.patch("/api/favourites/9999", json={"custom_name": "x"}).status_code == 404
     assert client.delete("/api/favourites/9999").status_code == 404
+
+
+def test_bus_favourite_roundtrip():
+    created = client.post(
+        "/api/favourites",
+        json={"stop_id": "01029", "custom_name": "Bus 7 @ Natl Lib",
+              "group_name": "My Buses", "service_no": "7"},
+    ).json()
+    assert created["service_no"] == "7"
+
+    listed = client.get("/api/favourites").json()["favourites"]
+    assert listed[0]["service_no"] == "7"
+
+
+def test_stop_favourite_has_null_service_no():
+    client.post("/api/favourites", json={"stop_id": "01012", "custom_name": "Home"})
+    listed = client.get("/api/favourites").json()["favourites"]
+    assert listed[0]["service_no"] is None

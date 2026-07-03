@@ -10,6 +10,7 @@ class FavouriteIn(BaseModel):
     stop_id: str
     custom_name: str
     group_name: str = "Going out"
+    service_no: str | None = None  # set → a favourited bus, not a stop
 
 
 class RenameIn(BaseModel):
@@ -23,7 +24,7 @@ def list_all():
 
 @router.post("")
 def create(fav: FavouriteIn):
-    fav_id = db.add_favourite(fav.stop_id, fav.custom_name, fav.group_name)
+    fav_id = db.add_favourite(fav.stop_id, fav.custom_name, fav.group_name, fav.service_no)
     return {"id": fav_id, **fav.model_dump()}
 
 

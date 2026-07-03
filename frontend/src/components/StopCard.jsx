@@ -5,7 +5,7 @@ import CapacityBar from './CapacityBar';
 const POLL_MS = 15000;
 
 export default function StopCard({
-  stop, onShowBus, onShowRoute, onFavourite, watched, toggleWatch, defaultOpen = false,
+  stop, onShowBus, onShowRoute, onFavourite, onFavouriteBus, watched, toggleWatch, defaultOpen = false,
 }) {
   const [open, setOpen] = useState(defaultOpen);
   const [data, setData] = useState(null);
@@ -54,8 +54,13 @@ export default function StopCard({
               <span className="muted" title="Interval since previous bus">
                 every ~{svc.prev_interval_min} min
               </span>
+              <button className="plain" title="Save this bus to My Buses"
+                style={{ marginLeft: 'auto' }}
+                onClick={() => onFavouriteBus(stop, svc.service_no)}>
+                ⭐
+              </button>
               <button className="plain" title="Notify me when arriving"
-                style={{ marginLeft: 'auto', opacity: watched(stop.id, svc.service_no) ? 1 : 0.4 }}
+                style={{ opacity: watched(stop.id, svc.service_no) ? 1 : 0.4 }}
                 onClick={() => toggleWatch(stop.id, svc.service_no)}>
                 🔔
               </button>

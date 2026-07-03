@@ -7,6 +7,16 @@ import FavouritesPanel from './components/FavouritesPanel';
 import useWatch from './useWatch';
 
 const DEFAULT_CENTER = { lat: 1.2975, lon: 103.854 }; // Bugis — demo dataset area
+const AUTOWATCH_KEY = 'bababus-autowatch';
+
+const autoWatchStore = {
+  read: () => new Set(JSON.parse(localStorage.getItem(AUTOWATCH_KEY) || '[]')),
+  toggle(key) {
+    const stored = this.read();
+    if (stored.has(key)) stored.delete(key); else stored.add(key);
+    localStorage.setItem(AUTOWATCH_KEY, JSON.stringify([...stored]));
+  },
+};
 
 export default function App() {
   const [mode, setMode] = useState('...');
@@ -69,6 +79,12 @@ export default function App() {
       .then((route) => setMapTarget({ type: 'route', route }))
       .catch(() => setMapTarget(null));
 
+  const onPickPoint = (lat, lon) =>
+    getNearby(lat, lon).then((d) => {
+      setStops(d.stops);
+      setHeading(d.stops.length ? 'Stops near selected point' : 'No stops here (demo data covers Bugis)');
+    });
+
   const onFavourite = (stopObj) => {
     const name = window.prompt('Name this stop:', stopObj.name);
     if (!name) return;
@@ -76,6 +92,39 @@ export default function App() {
       ? 'Going out' : 'Coming back';
     addFavourite({ stop_id: stopObj.id, custom_name: name, group_name: group }).then(refreshFavs);
   };
+
+  const onFavouriteBus = (stopObj, serviceNo) => {
+    const name = window.prompt('Name this bus:', `Bus ${serviceNo} @ ${stopObj.name}`);
+    if (!name) return;
+    addFavourite({
+      stop_id: stopObj.id, custom_name: name, group_name: 'My Buses', service_no: serviceNo,
+    }).then(refreshFavs);
+  };
+
+  const openFavouriteBus = (fav) => {
+    openFavourite(fav.stop_id);
+    getArrivals(fav.stop_id)
+      .then((d) => {
+        const svc = d.services.find((s) => s.service_no === fav.service_no);
+        if (svc) onShowBus(fav.stop_id, fav.service_no, svc.bus_positions, d.stop_name);
+      })
+      .catch(() => {});
+  };
+
+  const toggleAutoWatch = (fav) => {
+    autoWatchStore.toggle(`${fav.stop_id}:${fav.service_no}`);
+    toggleWatch(fav.stop_id, fav.service_no);
+  };
+
+  // Re-arm persisted auto-watches whenever the favourites list loads
+  useEffect(() => {
+    const stored = autoWatchStore.read();
+    favourites
+      .filter((f) => f.service_no && stored.has(`${f.stop_id}:${f.service_no}`))
+      .forEach((f) => {
+        if (!watched(f.stop_id, f.service_no)) toggleWatch(f.stop_id, f.service_no);
+      });
+  }, [favourites]);
 
   const openFavourite = (stopId) => {
     const found = stops.find((s) => s.id === stopId);
@@ -100,11 +149,14 @@ export default function App() {
         <FavouritesPanel
           favourites={favourites}
           onOpen={openFavourite}
+          onOpenBus={openFavouriteBus}
           onRename={(id) => {
             const name = window.prompt('New name:');
             if (name) renameFavourite(id, name).then(refreshFavs);
           }}
           onDelete={(id) => deleteFavourite(id).then(refreshFavs)}
+          watched={watched}
+          toggleWatch={toggleAutoWatch}
         />
       </aside>
       <main className="main">
@@ -114,11 +166,20 @@ export default function App() {
         </h2>
         {stops.map((s) => (
           <StopCard key={s.id} stop={s} onShowBus={onShowBus} onShowRoute={onShowRoute}
-            onFavourite={onFavourite} watched={watched} toggleWatch={toggleWatch} />
+            onFavourite={onFavourite} onFavouriteBus={onFavouriteBus}
+            watched={watched} toggleWatch={toggleWatch} />
         ))}
       </main>
       <section className="mappane">
-        <BusMap target={mapTarget} />
+        {!mapTarget && (
+          <div className="maphint">🖱 Click the map to explore stops there · tap a marker for live arrivals</div>
+        )}
+        {mapTarget && (
+          <button className="mapclose" title="Back to explore map" onClick={() => setMapTarget(null)}>
+            ✕ explore
+          </button>
+        )}
+        <BusMap target={mapTarget} stops={stops} onPickPoint={onPickPoint} />
       </section>
       <footer className="footer">
         <span className="dot" />

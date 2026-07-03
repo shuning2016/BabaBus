@@ -18,9 +18,14 @@ def init_db(path: Optional[str] = None) -> None:
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 stop_id TEXT NOT NULL,
                 custom_name TEXT NOT NULL,
-                group_name TEXT NOT NULL DEFAULT 'Going out'
+                group_name TEXT NOT NULL DEFAULT 'Going out',
+                service_no TEXT
             )"""
         )
+        try:  # migrate pre-existing databases created before service_no
+            c.execute("ALTER TABLE favourites ADD COLUMN service_no TEXT")
+        except sqlite3.OperationalError:
+            pass
 
 
 def list_favourites(path: Optional[str] = None) -> list[dict]:
@@ -29,11 +34,17 @@ def list_favourites(path: Optional[str] = None) -> list[dict]:
         return [dict(r) for r in rows]
 
 
-def add_favourite(stop_id: str, custom_name: str, group_name: str, path: Optional[str] = None) -> int:
+def add_favourite(
+    stop_id: str,
+    custom_name: str,
+    group_name: str,
+    service_no: Optional[str] = None,
+    path: Optional[str] = None,
+) -> int:
     with contextlib.closing(_conn(path)) as c, c:
         cur = c.execute(
-            "INSERT INTO favourites (stop_id, custom_name, group_name) VALUES (?, ?, ?)",
-            (stop_id, custom_name, group_name),
+            "INSERT INTO favourites (stop_id, custom_name, group_name, service_no) VALUES (?, ?, ?, ?)",
+            (stop_id, custom_name, group_name, service_no),
         )
         return cur.lastrowid
 

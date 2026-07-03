@@ -1,6 +1,7 @@
 import L from 'leaflet';
-import { CircleMarker, MapContainer, Marker, Polyline, Popup, TileLayer, useMap } from 'react-leaflet';
-import { useEffect } from 'react';
+import { CircleMarker, MapContainer, Marker, Polyline, Popup, TileLayer, useMap, useMapEvents } from 'react-leaflet';
+import { useEffect, useState } from 'react';
+import { getArrivals } from '../api';
 
 const busIcon = L.divIcon({
   className: '',
@@ -20,17 +21,48 @@ function FitBounds({ points }) {
   return null;
 }
 
-export default function BusMap({ target }) {
-  if (!target) {
-    return (
-      <div style={{ padding: 20 }} className="muted">
-        Click a bus timing to see the bus on the map, or a service number to see its route.
-      </div>
-    );
-  }
+function ClickCatcher({ onPickPoint }) {
+  useMapEvents({ click: (e) => onPickPoint(e.latlng.lat, e.latlng.lng) });
+  return null;
+}
 
-  const points =
-    target.type === 'bus'
+/** Popup body that loads a station's live arrivals when opened. */
+function StopArrivalsPopup({ stop }) {
+  const [services, setServices] = useState(null);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    getArrivals(stop.id)
+      .then((d) => alive && setServices(d.services))
+      .catch(() => alive && setError(true));
+    return () => { alive = false; };
+  }, [stop.id]);
+
+  return (
+    <div style={{ minWidth: 170 }}>
+      <strong>{stop.name}</strong>{' '}
+      <span style={{ color: '#777', fontSize: 11 }}>{stop.id}</span>
+      {error && <div style={{ fontSize: 12 }}>Couldn't load arrivals</div>}
+      {!services && !error && <div style={{ fontSize: 12 }}>Loading arrivals…</div>}
+      {services && services.length === 0 && <div style={{ fontSize: 12 }}>No services here</div>}
+      {services && services.map((s) => (
+        <div key={s.service_no} style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 12, marginTop: 4 }}>
+          <span style={{ background: '#EE4D2D', color: '#fff', borderRadius: 4, padding: '0 6px', fontWeight: 700 }}>
+            {s.service_no}
+          </span>
+          <span>{s.etas.map((e) => (e <= 0 ? 'Arr' : `${e}m`)).join(' · ')}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export default function BusMap({ target, stops = [], onPickPoint }) {
+  const explore = !target;
+  const points = explore
+    ? stops.map((s) => [s.lat, s.lon])
+    : target.type === 'bus'
       ? target.positions.map((p) => [p.lat, p.lon])
       : target.route.polyline;
 
@@ -41,19 +73,26 @@ export default function BusMap({ target }) {
         url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
       <FitBounds points={points} />
-      {target.type === 'bus' &&
+      {explore && onPickPoint && <ClickCatcher onPickPoint={onPickPoint} />}
+      {explore && stops.map((s) => (
+        <CircleMarker key={s.id} center={[s.lat, s.lon]} radius={8}
+          pathOptions={{ color: '#EE4D2D', fillColor: '#fff', fillOpacity: 1 }}>
+          <Popup><StopArrivalsPopup stop={s} /></Popup>
+        </CircleMarker>
+      ))}
+      {!explore && target.type === 'bus' &&
         target.positions.map((p, i) => (
           <Marker key={i} position={[p.lat, p.lon]} icon={busIcon}>
             <Popup>Bus {target.serviceNo} → {target.stopName}</Popup>
           </Marker>
         ))}
-      {target.type === 'route' && (
+      {!explore && target.type === 'route' && (
         <>
           <Polyline positions={target.route.polyline} pathOptions={{ color: '#0080C6', weight: 5 }} />
           {target.route.stops.map((s) => (
             <CircleMarker key={s.id} center={[s.lat, s.lon]} radius={6}
               pathOptions={{ color: '#EE4D2D', fillColor: '#fff', fillOpacity: 1 }}>
-              <Popup>{s.name} ({s.id})</Popup>
+              <Popup><StopArrivalsPopup stop={s} /></Popup>
             </CircleMarker>
           ))}
         </>
