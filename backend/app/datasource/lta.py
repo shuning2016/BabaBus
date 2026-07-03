@@ -5,7 +5,7 @@ import httpx
 from .base import DataSource
 from .models import Route, ServiceArrival, Stop
 
-BASE = "http://datamall2.mytransport.sg/ltaodataservice"
+BASE = "https://datamall2.mytransport.sg/ltaodataservice"
 PAGE_SIZE = 500
 SGT = timezone(timedelta(hours=8))
 
@@ -49,7 +49,7 @@ class LTADataSource(DataSource):
         return self._stops
 
     def get_arrivals(self, stop_id: str) -> list[ServiceArrival]:
-        res = self.client.get(f"{BASE}/BusArrivalv2", params={"BusStopCode": stop_id})
+        res = self.client.get(f"{BASE}/v3/BusArrival", params={"BusStopCode": stop_id})
         res.raise_for_status()
         now = datetime.now(timezone.utc)
         out = []

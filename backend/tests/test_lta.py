@@ -29,8 +29,8 @@ class FakeClient:
         if path == "BusRoutes":
             data = self.payloads["BusRoutes"] if params.get("$skip", 0) == 0 else []
             return FakeResponse({"value": data})
-        if path == "BusArrivalv2":
-            return FakeResponse(self.payloads["BusArrivalv2"])
+        if path == "BusArrival":  # v3/BusArrival
+            return FakeResponse(self.payloads["BusArrival"])
         raise AssertionError(f"unexpected url {url}")
 
 
@@ -50,7 +50,7 @@ PAYLOADS = {
         {"ServiceNo": "7", "Direction": 1, "StopSequence": 2, "BusStopCode": "01013"},
         {"ServiceNo": "7", "Direction": 2, "StopSequence": 1, "BusStopCode": "01013"},
     ],
-    "BusArrivalv2": {
+    "BusArrival": {
         "Services": [
             {
                 "ServiceNo": "7",
