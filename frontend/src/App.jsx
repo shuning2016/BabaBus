@@ -32,6 +32,7 @@ export default function App() {
   const [mapTarget, setMapTarget] = useState(null);
   const [exploreCenter, setExploreCenter] = useState(null); // [lat, lon] of a user-picked place
   const [favourites, setFavourites] = useState([]);
+  const [areaBuses, setAreaBuses] = useState([]); // live buses near the explore view
   const { watched, toggleWatch } = useWatch();
   const lastLoad = useRef(null); // [lat, lon] of the last nearby fetch
 
@@ -108,6 +109,39 @@ export default function App() {
       setHeading(d.stops.length ? `Stops near ${place.label}` : `No stops near ${place.label}`);
     });
   };
+
+  // Live buses around the explore view: pull arrivals for the visible stops,
+  // plot every reported bus position, refresh on the arrivals cadence.
+  useEffect(() => {
+    if (mapTarget || stops.length === 0) {
+      setAreaBuses([]);
+      return undefined;
+    }
+    let alive = true;
+    const load = () =>
+      Promise.all(
+        stops.slice(0, 8).map((s) =>
+          getArrivals(s.id)
+            .then((d) => d.services.flatMap((svc) =>
+              svc.bus_positions.map((p) => ({ ...p, service_no: svc.service_no, toward: d.stop_name }))))
+            .catch(() => [])
+        )
+      ).then((lists) => {
+        if (!alive) return;
+        const seen = new Map();
+        lists.flat().forEach((b) => {
+          const key = `${b.service_no}:${b.lat.toFixed(3)}:${b.lon.toFixed(3)}`;
+          // keep buses roughly within the loaded area so far-off ones don't clutter
+          if (!seen.has(key) && (!lastLoad.current || approxMetres([b.lat, b.lon], lastLoad.current) < 2000)) {
+            seen.set(key, b);
+          }
+        });
+        setAreaBuses([...seen.values()]);
+      });
+    load();
+    const timer = setInterval(load, 15000);
+    return () => { alive = false; clearInterval(timer); };
+  }, [mapTarget, stops]);
 
   // Panning the explore map loads the stops around the new view automatically.
   const onMapMove = (lat, lon) => {
@@ -214,7 +248,7 @@ export default function App() {
             ✕ explore
           </button>
         )}
-        <BusMap target={mapTarget} stops={stops} onPickPoint={onPickPoint} onMapMove={onMapMove} center={exploreCenter} />
+        <BusMap target={mapTarget} stops={stops} buses={areaBuses} onPickPoint={onPickPoint} onMapMove={onMapMove} center={exploreCenter} />
       </section>
       <footer className="footer">
         <span className="dot" />

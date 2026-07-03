@@ -10,6 +10,15 @@ const busIcon = L.divIcon({
   iconAnchor: [14, 14],
 });
 
+// Small labelled chip for live buses on the explore map
+const busChipIcon = (serviceNo) =>
+  L.divIcon({
+    className: '',
+    html: `<div style="background:#EE4D2D;color:#fff;border-radius:10px;padding:1px 7px;font-size:11px;font-weight:700;white-space:nowrap;display:inline-block;box-shadow:0 1px 4px rgba(0,0,0,.4)">🚌 ${serviceNo}</div>`,
+    iconSize: [44, 18],
+    iconAnchor: [22, 9],
+  });
+
 const placeIcon = L.divIcon({
   className: '',
   html: '<div style="font-size:28px;line-height:28px;filter:drop-shadow(0 1px 2px rgba(0,0,0,.45))">📍</div>',
@@ -75,7 +84,7 @@ function StopArrivalsPopup({ stop }) {
   );
 }
 
-export default function BusMap({ target, stops = [], onPickPoint, onMapMove, center }) {
+export default function BusMap({ target, stops = [], buses = [], onPickPoint, onMapMove, center }) {
   const explore = !target;
   // In explore mode, only recenter when the picked place changes — never on
   // stop updates, so panning the map doesn't get yanked back by FitBounds.
@@ -99,6 +108,12 @@ export default function BusMap({ target, stops = [], onPickPoint, onMapMove, cen
           <Popup>Selected location</Popup>
         </Marker>
       )}
+      {explore && buses.map((b) => (
+        <Marker key={`${b.service_no}:${b.lat}:${b.lon}`} position={[b.lat, b.lon]}
+          icon={busChipIcon(b.service_no)} zIndexOffset={500}>
+          <Popup>Bus {b.service_no} — heading to {b.toward}</Popup>
+        </Marker>
+      ))}
       {explore && stops.map((s) => (
         <CircleMarker key={s.id} center={[s.lat, s.lon]} radius={8}
           pathOptions={{ color: '#EE4D2D', fillColor: '#fff', fillOpacity: 1 }}>
