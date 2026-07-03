@@ -1,3 +1,4 @@
+import contextlib
 import sqlite3
 from typing import Optional
 
@@ -11,7 +12,7 @@ def _conn(path: Optional[str] = None) -> sqlite3.Connection:
 
 
 def init_db(path: Optional[str] = None) -> None:
-    with _conn(path) as c:
+    with contextlib.closing(_conn(path)) as c, c:
         c.execute(
             """CREATE TABLE IF NOT EXISTS favourites (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -23,13 +24,13 @@ def init_db(path: Optional[str] = None) -> None:
 
 
 def list_favourites(path: Optional[str] = None) -> list[dict]:
-    with _conn(path) as c:
+    with contextlib.closing(_conn(path)) as c, c:
         rows = c.execute("SELECT * FROM favourites ORDER BY group_name, id").fetchall()
         return [dict(r) for r in rows]
 
 
 def add_favourite(stop_id: str, custom_name: str, group_name: str, path: Optional[str] = None) -> int:
-    with _conn(path) as c:
+    with contextlib.closing(_conn(path)) as c, c:
         cur = c.execute(
             "INSERT INTO favourites (stop_id, custom_name, group_name) VALUES (?, ?, ?)",
             (stop_id, custom_name, group_name),
@@ -38,12 +39,12 @@ def add_favourite(stop_id: str, custom_name: str, group_name: str, path: Optiona
 
 
 def delete_favourite(fav_id: int, path: Optional[str] = None) -> bool:
-    with _conn(path) as c:
+    with contextlib.closing(_conn(path)) as c, c:
         return c.execute("DELETE FROM favourites WHERE id = ?", (fav_id,)).rowcount > 0
 
 
 def rename_favourite(fav_id: int, custom_name: str, path: Optional[str] = None) -> bool:
-    with _conn(path) as c:
+    with contextlib.closing(_conn(path)) as c, c:
         cur = c.execute(
             "UPDATE favourites SET custom_name = ? WHERE id = ?", (custom_name, fav_id)
         )
