@@ -9,3 +9,8 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     <App />
   </React.StrictMode>
 );
+
+// Installable PWA (Android "Add to Home Screen"); dev stays SW-free.
+if (!import.meta.env.DEV && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js'));
+}

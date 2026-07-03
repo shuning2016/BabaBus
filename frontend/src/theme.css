@@ -49,6 +49,34 @@ button.plain { background: none; border: none; cursor: pointer; font-size: 15px;
 .results div { padding: 8px 12px; cursor: pointer; }
 .results div:hover { background: #FDEDE8; }
 .group h4 { color: var(--shopee-yellow); font-size: 12px; text-transform: uppercase; margin: 14px 0 6px; }
+.tabbar { display: none; }
+
+/* Mobile: single column, bottom tab bar switches between the three panes.
+   Panes overlap in the same grid cell and toggle visibility (not display)
+   so the Leaflet map keeps real dimensions while hidden. */
+@media (max-width: 760px) {
+  .layout { grid-template-columns: 1fr; grid-template-rows: 56px 1fr 52px; }
+  .header { grid-column: 1; gap: 8px; padding: 0 10px; }
+  .header h1 { font-size: 16px; }
+  .badge { display: none; }
+  .sidebar, .main, .mappane { grid-area: 2 / 1; visibility: hidden; }
+  .layout.tab-saved .sidebar, .layout.tab-list .main, .layout.tab-map .mappane { visibility: visible; }
+  .mappane { border-left: none; }
+  .footer { display: none; }
+  .tabbar {
+    grid-area: 3 / 1; display: flex; background: var(--navy);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .tabbar button {
+    flex: 1; background: none; border: none; color: #fff; opacity: .6;
+    font-size: 18px; display: flex; flex-direction: column; align-items: center;
+    gap: 2px; cursor: pointer; font-family: inherit; padding: 6px 0;
+  }
+  .tabbar button span { font-size: 10px; font-weight: 700; }
+  .tabbar button.on { opacity: 1; color: var(--shopee-yellow); }
+  .row { flex-wrap: wrap; }
+  .searchwrap { max-width: none; }
+}
 .fav { display: flex; align-items: center; gap: 6px; padding: 6px 4px; border-radius: 6px; cursor: pointer; font-size: 14px; }
 .fav:hover { background: rgba(255,255,255,.1); }
 .fav .actions { margin-left: auto; opacity: .7; }

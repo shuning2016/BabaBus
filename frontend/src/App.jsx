@@ -37,6 +37,7 @@ export default function App() {
   const [favourites, setFavourites] = useState([]);
   const [areaBuses, setAreaBuses] = useState([]); // live buses near the explore view
   const [schedules, setSchedules] = useState([]);
+  const [tab, setTab] = useState('list'); // mobile: which pane is visible
   const { watched, toggleWatch } = useWatch();
   const activeAlarms = useAlarms(schedules);
   const lastLoad = useRef(null); // [lat, lon] of the last nearby fetch
@@ -234,7 +235,7 @@ export default function App() {
   };
 
   return (
-    <div className="layout">
+    <div className={`layout tab-${tab}`}>
       <header className="header">
         <h1>🚌 BabaBus</h1>
         <SearchBar
@@ -292,6 +293,17 @@ export default function App() {
         )}
         <BusMap target={mapTarget} stops={stops} buses={areaBuses} onPickPoint={onPickPoint} onMapMove={onMapMove} center={exploreCenter} />
       </section>
+      <nav className="tabbar">
+        <button className={tab === 'list' ? 'on' : ''} onClick={() => setTab('list')}>
+          🚏<span>Nearby</span>
+        </button>
+        <button className={tab === 'map' ? 'on' : ''} onClick={() => setTab('map')}>
+          🗺️<span>Map</span>
+        </button>
+        <button className={tab === 'saved' ? 'on' : ''} onClick={() => setTab('saved')}>
+          ⭐<span>Saved</span>
+        </button>
+      </nav>
       <footer className="footer">
         <span className="dot" />
         {mode === 'demo'

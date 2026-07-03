@@ -5,7 +5,7 @@
   ],
   "routes": [
     { "src": "/api/(.*)", "dest": "/api/index.py" },
-    { "src": "/(assets/.*|favicon\\.svg)", "dest": "/frontend/$1" },
+    { "src": "/(assets/.*|favicon\\.svg|manifest\\.webmanifest|sw\\.js|icon-\\d+\\.png)", "dest": "/frontend/$1" },
     { "src": "/(.*)", "dest": "/frontend/index.html" }
   ]
 }
