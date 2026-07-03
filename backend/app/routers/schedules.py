@@ -14,6 +14,7 @@ class ScheduleIn(BaseModel):
     start_time: str = Field(pattern=HHMM)  # local time, e.g. "06:40"
     end_time: str = Field(pattern=HHMM)
     label: str = ""
+    remind_every: int = Field(default=4, ge=1, le=60)  # push cadence, minutes
 
 
 class ScheduleUpdate(BaseModel):
@@ -21,6 +22,7 @@ class ScheduleUpdate(BaseModel):
     start_time: str | None = Field(default=None, pattern=HHMM)
     end_time: str | None = Field(default=None, pattern=HHMM)
     label: str | None = None
+    remind_every: int | None = Field(default=None, ge=1, le=60)
 
 
 @router.get("")
@@ -30,7 +32,9 @@ def list_all():
 
 @router.post("")
 def create(s: ScheduleIn):
-    schedule_id = db.add_schedule(s.stop_id, s.service_no, s.start_time, s.end_time, s.label)
+    schedule_id = db.add_schedule(
+        s.stop_id, s.service_no, s.start_time, s.end_time, s.label, s.remind_every
+    )
     return {"id": schedule_id, "enabled": True, **s.model_dump()}
 
 

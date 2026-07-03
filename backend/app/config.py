@@ -11,6 +11,12 @@ class Settings(BaseSettings):
     # across serverless instances instead of dying with the ephemeral /tmp file
     turso_url: str = ""
     turso_token: str = ""
+    # Web Push (VAPID). vapid_private_b64 is base64 of the PKCS8 PEM.
+    vapid_public_key: str = ""
+    vapid_private_b64: str = ""
+    vapid_subject: str = "mailto:shuning2016@gmail.com"
+    # shared secret guarding the cron-triggered /api/push/tick endpoint
+    push_secret: str = ""
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     @property

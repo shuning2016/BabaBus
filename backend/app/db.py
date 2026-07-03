@@ -114,6 +114,19 @@ def init_db(path: Optional[str] = None) -> None:
         )""",
         path=path,
     )
+    for col, decl in (("remind_every", "INTEGER NOT NULL DEFAULT 4"), ("last_push", "INTEGER")):
+        try:
+            _run(f"ALTER TABLE schedules ADD COLUMN {col} {decl}", path=path)
+        except sqlite3.OperationalError:
+            pass
+    _run(
+        """CREATE TABLE IF NOT EXISTS push_subscriptions (
+            endpoint TEXT PRIMARY KEY,
+            p256dh TEXT NOT NULL,
+            auth TEXT NOT NULL
+        )""",
+        path=path,
+    )
 
 
 def list_favourites(path: Optional[str] = None) -> list[dict]:
@@ -155,14 +168,35 @@ def add_schedule(
     start_time: str,
     end_time: str,
     label: str = "",
+    remind_every: int = 4,
     path: Optional[str] = None,
 ) -> int:
     return _run(
-        "INSERT INTO schedules (stop_id, service_no, start_time, end_time, label)"
-        " VALUES (?, ?, ?, ?, ?)",
-        (stop_id, service_no, start_time, end_time, label),
+        "INSERT INTO schedules (stop_id, service_no, start_time, end_time, label, remind_every)"
+        " VALUES (?, ?, ?, ?, ?, ?)",
+        (stop_id, service_no, start_time, end_time, label, remind_every),
         path=path,
     )["lastrowid"]
+
+
+def set_last_push(schedule_id: int, epoch: int, path: Optional[str] = None) -> None:
+    _run("UPDATE schedules SET last_push = ? WHERE id = ?", (epoch, schedule_id), path=path)
+
+
+def add_subscription(endpoint: str, p256dh: str, auth: str, path: Optional[str] = None) -> None:
+    _run(
+        "INSERT OR REPLACE INTO push_subscriptions (endpoint, p256dh, auth) VALUES (?, ?, ?)",
+        (endpoint, p256dh, auth),
+        path=path,
+    )
+
+
+def list_subscriptions(path: Optional[str] = None) -> list[dict]:
+    return _run("SELECT * FROM push_subscriptions", path=path)["rows"]
+
+
+def delete_subscription(endpoint: str, path: Optional[str] = None) -> bool:
+    return _run("DELETE FROM push_subscriptions WHERE endpoint = ?", (endpoint,), path=path)["rowcount"] > 0
 
 
 def update_schedule(schedule_id: int, fields: dict, path: Optional[str] = None) -> bool:

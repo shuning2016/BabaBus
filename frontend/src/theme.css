@@ -113,6 +113,12 @@ button.plain:hover { background: #F4F5F7; }
 .alarmtimes input[type="time"] { font-family: inherit; font-size: 14px; font-weight: 700; color: var(--navy); border: 1.5px solid var(--line); border-radius: 8px; padding: 6px 8px; background: #fff; }
 .alarmtimes input[type="time"]:focus { outline: none; border-color: var(--shopee-orange); }
 .alarmlive { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); font-size: 13px; }
+.alarmtimes select { font-family: inherit; font-size: 14px; font-weight: 700; color: var(--navy); border: 1.5px solid var(--line); border-radius: 8px; padding: 6px 8px; background: #fff; }
+.alarmtimes select:focus { outline: none; border-color: var(--shopee-orange); }
+
+.pushbanner { background: #fff; border: 1.5px solid var(--line); border-radius: 12px; padding: 12px 14px; margin-bottom: 14px; font-size: 14px; line-height: 1.5; display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+.pushbanner.on { background: #FFF7E0; border-color: var(--shopee-yellow); }
+.pushbanner .pill { margin-left: auto; }
 
 /* ---------- Map ---------- */
 .mapclose { position: absolute; top: 12px; left: 12px; z-index: 1000; background: #fff; color: var(--navy); border: none; border-radius: 999px; padding: 8px 14px; font-size: 12px; font-weight: 700; cursor: pointer; font-family: inherit; box-shadow: 0 2px 8px rgba(0,0,0,.2); }

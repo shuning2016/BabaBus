@@ -18,6 +18,29 @@ self.addEventListener('activate', (e) => {
   );
 });
 
+// Web Push: show the notification the backend sent, even when the app is closed.
+self.addEventListener('push', (e) => {
+  let data = {};
+  try { data = e.data ? e.data.json() : {}; } catch { data = {}; }
+  e.waitUntil(self.registration.showNotification(data.title || 'BabaBus', {
+    body: data.body || '',
+    icon: '/icon-192.png',
+    badge: '/icon-192.png',
+    tag: data.tag,
+    renotify: true,
+  }));
+});
+
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close();
+  e.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((cs) => {
+      for (const c of cs) { if ('focus' in c) return c.focus(); }
+      return self.clients.openWindow ? self.clients.openWindow('/') : undefined;
+    })
+  );
+});
+
 self.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url);
   if (e.request.method !== 'GET' || url.origin !== self.location.origin || url.pathname.startsWith('/api/')) return;

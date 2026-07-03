@@ -31,6 +31,13 @@ function AlarmRow({ s, live, onChanged }) {
         <span className="muted">to</span>
         <input type="time" value={s.end_time} onChange={(e) => patch({ end_time: e.target.value })} />
       </div>
+      <div className="alarmtimes">
+        <span className="muted">Remind my phone every</span>
+        <select value={s.remind_every || 4} onChange={(e) => patch({ remind_every: Number(e.target.value) })}>
+          {[1, 2, 3, 4, 5, 10, 15].map((n) => <option key={n} value={n}>{n} min</option>)}
+        </select>
+        <span className="muted">while active</span>
+      </div>
       {live && (
         <div className="alarmlive">
           {live.etas.length

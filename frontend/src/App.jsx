@@ -8,6 +8,7 @@ import AlarmsPanel from './components/AlarmsPanel';
 import useWatch from './useWatch';
 import useAlarms from './useAlarms';
 import useInstallPrompt from './useInstallPrompt';
+import usePush from './usePush';
 import { HHMM_RE } from './alarmClock';
 import { approxMetres, assignBusIds } from './geo';
 
@@ -30,6 +31,38 @@ const TABS = [
   { id: 'nearby', icon: '📍', label: 'Nearby' },
 ];
 
+function PushBanner({ push }) {
+  const { status, busy, enable, disable } = push;
+  if (status === 'on') {
+    return (
+      <div className="pushbanner on">
+        🔔 Phone alarms are <strong>on</strong> — you'll be reminded even when the app is closed.
+        <button className="pill" onClick={disable} disabled={busy}>Turn off</button>
+      </div>
+    );
+  }
+  if (status === 'needs-install') {
+    return (
+      <div className="pushbanner">
+        📲 To get alarms when the app is closed, install BabaBus first: tap <strong>Share → Add to Home Screen</strong>,
+        then open it from your home screen and enable alarms here.
+      </div>
+    );
+  }
+  if (status === 'denied') {
+    return <div className="pushbanner">🔕 Notifications are blocked. Allow them for BabaBus in your browser/site settings, then reload.</div>;
+  }
+  if (status === 'unsupported') {
+    return <div className="pushbanner">This browser can't deliver background alarms. Open the installed BabaBus app instead.</div>;
+  }
+  return (
+    <div className="pushbanner">
+      🔔 Turn on phone alarms to get reminded even when the app is closed.
+      <button className="pill" onClick={enable} disabled={busy}>{busy ? 'Enabling…' : 'Enable phone alarms'}</button>
+    </div>
+  );
+}
+
 export default function App() {
   const [mode, setMode] = useState('...');
   const [stops, setStops] = useState([]);
@@ -43,6 +76,7 @@ export default function App() {
   const { watched, toggleWatch } = useWatch();
   const activeAlarms = useAlarms(schedules);
   const { canInstall, install } = useInstallPrompt();
+  const push = usePush();
   const lastLoad = useRef(null);
   const prevBuses = useRef([]);
 
@@ -254,6 +288,7 @@ export default function App() {
           <div className="paneheader">
             <h2>Bus Alarms</h2>
           </div>
+          <PushBanner push={push} />
           <AlarmsPanel schedules={schedules} active={activeAlarms} onChanged={refreshSchedules} />
         </section>
 

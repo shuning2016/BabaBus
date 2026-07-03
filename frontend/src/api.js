@@ -35,3 +35,6 @@ export const addSchedule = (body) => j('/api/schedules', post(body));
 export const updateSchedule = (id, body) =>
   j(`/api/schedules/${id}`, { ...post(body), method: 'PATCH' });
 export const deleteSchedule = (id) => j(`/api/schedules/${id}`, { method: 'DELETE' });
+export const getVapidKey = () => j('/api/push/vapid');
+export const subscribePush = (sub) => j('/api/push/subscribe', post(sub));
+export const unsubscribePush = (sub) => j('/api/push/unsubscribe', post(sub));
