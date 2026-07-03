@@ -11,10 +11,12 @@ const busIcon = L.divIcon({
 
 function FitBounds({ points }) {
   const map = useMap();
+  const signature = JSON.stringify(points);
   useEffect(() => {
-    if (points.length === 1) map.setView(points[0], 16);
-    else if (points.length > 1) map.fitBounds(points, { padding: [30, 30] });
-  }, [map, points]);
+    const pts = JSON.parse(signature);
+    if (pts.length === 1) map.setView(pts[0], 16);
+    else if (pts.length > 1) map.fitBounds(pts, { padding: [30, 30] });
+  }, [map, signature]);
   return null;
 }
 
