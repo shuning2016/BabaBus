@@ -10,6 +10,13 @@ const busIcon = L.divIcon({
   iconAnchor: [14, 14],
 });
 
+const placeIcon = L.divIcon({
+  className: '',
+  html: '<div style="font-size:28px;line-height:28px;filter:drop-shadow(0 1px 2px rgba(0,0,0,.45))">📍</div>',
+  iconSize: [28, 28],
+  iconAnchor: [14, 28],
+});
+
 function FitBounds({ points }) {
   const map = useMap();
   const signature = JSON.stringify(points);
@@ -58,10 +65,10 @@ function StopArrivalsPopup({ stop }) {
   );
 }
 
-export default function BusMap({ target, stops = [], onPickPoint }) {
+export default function BusMap({ target, stops = [], onPickPoint, center }) {
   const explore = !target;
   const points = explore
-    ? stops.map((s) => [s.lat, s.lon])
+    ? [...stops.map((s) => [s.lat, s.lon]), ...(center ? [center] : [])]
     : target.type === 'bus'
       ? target.positions.map((p) => [p.lat, p.lon])
       : target.route.polyline;
@@ -74,6 +81,11 @@ export default function BusMap({ target, stops = [], onPickPoint }) {
       />
       <FitBounds points={points} />
       {explore && onPickPoint && <ClickCatcher onPickPoint={onPickPoint} />}
+      {explore && center && (
+        <Marker position={center} icon={placeIcon}>
+          <Popup>Selected location</Popup>
+        </Marker>
+      )}
       {explore && stops.map((s) => (
         <CircleMarker key={s.id} center={[s.lat, s.lon]} radius={8}
           pathOptions={{ color: '#EE4D2D', fillColor: '#fff', fillOpacity: 1 }}>

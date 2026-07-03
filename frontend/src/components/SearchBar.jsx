@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { search } from '../api';
 
-export default function SearchBar({ onPickStop, onPickService }) {
+export default function SearchBar({ onPickStop, onPickService, onPickPlace }) {
   const [q, setQ] = useState('');
   const [results, setResults] = useState(null);
   const seq = useRef(0);
@@ -35,8 +35,8 @@ export default function SearchBar({ onPickStop, onPickService }) {
             </div>
           ))}
           {results.geocoded && (
-            <div className="muted" style={{ cursor: 'default' }}>
-              📍 near {results.geocoded.label}
+            <div onClick={() => { onPickPlace(results.geocoded); close(); }}>
+              📍 Go to <strong>{results.geocoded.label}</strong>
             </div>
           )}
           {results.stops.map((s) => (
@@ -44,7 +44,7 @@ export default function SearchBar({ onPickStop, onPickService }) {
               🚏 {s.name} <span className="muted">({s.id}, {s.road})</span>
             </div>
           ))}
-          {!results.services.length && !results.stops.length && (
+          {!results.services.length && !results.stops.length && !results.geocoded && (
             <div className="muted" style={{ cursor: 'default' }}>No matches</div>
           )}
         </div>

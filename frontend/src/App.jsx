@@ -23,6 +23,7 @@ export default function App() {
   const [stops, setStops] = useState([]);
   const [heading, setHeading] = useState('Nearby stops');
   const [mapTarget, setMapTarget] = useState(null);
+  const [exploreCenter, setExploreCenter] = useState(null); // [lat, lon] of a user-picked place
   const [favourites, setFavourites] = useState([]);
   const { watched, toggleWatch } = useWatch();
 
@@ -79,11 +80,24 @@ export default function App() {
       .then((route) => setMapTarget({ type: 'route', route }))
       .catch(() => setMapTarget(null));
 
-  const onPickPoint = (lat, lon) =>
-    getNearby(lat, lon).then((d) => {
+  const onPickPoint = (lat, lon) => {
+    setExploreCenter([lat, lon]);
+    return getNearby(lat, lon).then((d) => {
       setStops(d.stops);
       setHeading(d.stops.length ? 'Stops near selected point' : 'No stops here (demo data covers Bugis)');
     });
+  };
+
+  const onPickPlace = (place) => {
+    setMapTarget(null); // jump back to the explore map
+    setExploreCenter([place.lat, place.lon]);
+    getNearby(place.lat, place.lon).then((d) => {
+      setStops(d.stops);
+      setHeading(d.stops.length
+        ? `Stops near ${place.label}`
+        : `No stops near ${place.label} (demo data covers Bugis)`);
+    });
+  };
 
   const onFavourite = (stopObj) => {
     const name = window.prompt('Name this stop:', stopObj.name);
@@ -141,6 +155,7 @@ export default function App() {
         <SearchBar
           onPickStop={(s) => { setStops([s]); setHeading('Search result'); }}
           onPickService={onShowRoute}
+          onPickPlace={onPickPlace}
         />
         <span className="badge">{mode.toUpperCase()} MODE</span>
       </header>
@@ -179,7 +194,7 @@ export default function App() {
             ✕ explore
           </button>
         )}
-        <BusMap target={mapTarget} stops={stops} onPickPoint={onPickPoint} />
+        <BusMap target={mapTarget} stops={stops} onPickPoint={onPickPoint} center={exploreCenter} />
       </section>
       <footer className="footer">
         <span className="dot" />
