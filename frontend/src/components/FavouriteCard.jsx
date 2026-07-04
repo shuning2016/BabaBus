@@ -12,7 +12,7 @@ const POLL_MS = 15000;
  * The ⏰ opens the station alarm form (bus favourites preselect their bus).
  */
 export default function FavouriteCard({
-  fav, onShowBus, onShowRoute, onCreateStationAlarm, onRename, onDelete,
+  fav, onShowBus, onShowRoute, onCreateStationAlarm, onQuickAlarm, onRename, onDelete,
 }) {
   const [data, setData] = useState(null);
   const [error, setError] = useState(false);
@@ -41,7 +41,7 @@ export default function FavouriteCard({
           <h3>{isBus ? '🚌 ' : '🚏 '}{fav.custom_name}</h3>
           <span className="muted">{data ? data.stop_name : fav.stop_id}</span>
         </div>
-        {onCreateStationAlarm && data && (
+        {onCreateStationAlarm && data && !isBus && (
           <button className="plain" title="Set an alarm for this station"
             onClick={() => setAlarming(!alarming)}>⏰</button>
         )}
@@ -50,11 +50,10 @@ export default function FavouriteCard({
       </div>
       {error && <p className="stale">Couldn't load timings</p>}
       {!data && !error && <p className="muted">Loading timings…</p>}
-      {data && alarming && (
+      {data && alarming && !isBus && (
         <AlarmForm
           stop={{ id: fav.stop_id, name: data.stop_name }}
           services={data.services.map((s) => s.service_no)}
-          initialPicked={isBus ? [fav.service_no] : undefined}
           onCreate={(payload) => { onCreateStationAlarm(payload); setAlarming(false); }}
           onCancel={() => setAlarming(false)}
         />
@@ -65,8 +64,8 @@ export default function FavouriteCard({
       )}
       {services.map((svc) => (
         <ArrivalRow key={svc.service_no} svc={svc} stopId={fav.stop_id} stopName={data.stop_name}
-          onShowBus={onShowBus} onShowRoute={onShowRoute}
-          showSave={false} showWatch={false} />
+          onShowBus={onShowBus} onShowRoute={onShowRoute} onQuickAlarm={onQuickAlarm}
+          showSave={false} />
       ))}
     </div>
   );

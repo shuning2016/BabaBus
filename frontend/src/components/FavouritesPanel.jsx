@@ -5,7 +5,7 @@ import FavouriteCard from './FavouriteCard';
  * showing its live arrivals inline.
  */
 export default function FavouritesPanel({
-  favourites, onShowBus, onShowRoute, onCreateStationAlarm, onRename, onDelete,
+  favourites, onShowBus, onShowRoute, onCreateStationAlarm, onQuickAlarm, onRename, onDelete,
 }) {
   const buses = favourites.filter((f) => f.service_no);
   const stopFavs = favourites.filter((f) => !f.service_no);
@@ -25,7 +25,8 @@ export default function FavouritesPanel({
       <h4 className="sectiontitle">{title}</h4>
       {items.map((f) => (
         <FavouriteCard key={f.id} fav={f}
-          onShowBus={onShowBus} onShowRoute={onShowRoute} onCreateStationAlarm={onCreateStationAlarm}
+          onShowBus={onShowBus} onShowRoute={onShowRoute}
+          onCreateStationAlarm={onCreateStationAlarm} onQuickAlarm={onQuickAlarm}
           onRename={onRename} onDelete={onDelete} />
       ))}
     </div>

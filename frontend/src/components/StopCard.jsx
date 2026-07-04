@@ -7,7 +7,7 @@ const POLL_MS = 15000;
 
 export default function StopCard({
   stop, onShowBus, onShowRoute, onFavourite, onFavouriteBus, onCreateStationAlarm,
-  watched, toggleWatch, defaultOpen = false, autoAlarm = false, onAutoAlarmHandled,
+  onQuickAlarm, defaultOpen = false, autoAlarm = false, onAutoAlarmHandled,
 }) {
   const [open, setOpen] = useState(defaultOpen);
   const [data, setData] = useState(null);
@@ -68,8 +68,7 @@ export default function StopCard({
           {data.services.map((svc) => (
             <ArrivalRow key={svc.service_no} svc={svc} stopId={stop.id} stopName={data.stop_name}
               onShowBus={onShowBus} onShowRoute={onShowRoute}
-              onFavouriteBus={onFavouriteBus}
-              watched={watched} toggleWatch={toggleWatch} showAlarm={false} />
+              onFavouriteBus={onFavouriteBus} onQuickAlarm={onQuickAlarm} />
           ))}
         </>
       )}

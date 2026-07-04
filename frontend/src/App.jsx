@@ -6,11 +6,11 @@ import BusMap from './components/BusMap';
 import FavouritesPanel from './components/FavouritesPanel';
 import AlarmsPanel from './components/AlarmsPanel';
 import FloatingAlarms from './components/FloatingAlarms';
-import useWatch from './useWatch';
 import useAlarms from './useAlarms';
 import useInstallPrompt from './useInstallPrompt';
 import usePush from './usePush';
 import { approxMetres, assignBusIds } from './geo';
+import { isWithinWindow, minutesNow, toHHMM } from './alarmClock';
 
 const DEFAULT_CENTER = { lat: 1.2975, lon: 103.854 }; // Bugis — demo dataset area
 
@@ -63,7 +63,6 @@ export default function App() {
   const [areaBuses, setAreaBuses] = useState([]);
   const [schedules, setSchedules] = useState([]);
   const [tab, setTab] = useState('fav'); // default page = Favourite
-  const { watched, toggleWatch } = useWatch();
   const activeAlarms = useAlarms(schedules);
   const { canInstall, install } = useInstallPrompt();
   const push = usePush();
@@ -209,6 +208,29 @@ export default function App() {
     return addSchedule(payload).then(() => { refreshSchedules(); setTab('alarms'); });
   };
 
+  // 🔔 quick alarm: monitor one bus at a stop from now to +30 min. The floating
+  // widget appears immediately (the window is active), so no tab switch.
+  const quickAlarm = (serviceNo, stopId, stopName) => {
+    const now = minutesNow();
+    const dup = schedules.find((s) =>
+      s.enabled && s.stop_id === stopId && s.services.length === 1 &&
+      s.services[0] === serviceNo && isWithinWindow(now, s.start_time, s.end_time));
+    if (dup) return Promise.resolve(); // already watching this bus here right now
+    requestNotif();
+    return addSchedule({
+      stop_id: stopId, services: [serviceNo],
+      start_time: toHHMM(now), end_time: toHHMM(now + 30),
+      label: `${serviceNo} @ ${stopName}`,
+    }).then(refreshSchedules);
+  };
+
+  // 🔔 on a map bus marker: alarm at the station nearest the bus's position
+  const quickAlarmAtBus = (bus) =>
+    getNearby(bus.lat, bus.lon).then((d) => {
+      if (d.stops.length) return quickAlarm(bus.service_no, d.stops[0].id, d.stops[0].name);
+      return null;
+    }).catch(() => {});
+
   // From a map stop popup: jump to the stop's card with the alarm form open
   const [alarmStopId, setAlarmStopId] = useState(null);
   const onAlarmStop = (stop) => {
@@ -250,7 +272,7 @@ export default function App() {
           <FavouritesPanel
             favourites={favourites}
             onShowBus={onShowBus} onShowRoute={onShowRoute}
-            onCreateStationAlarm={onCreateStationAlarm}
+            onCreateStationAlarm={onCreateStationAlarm} onQuickAlarm={quickAlarm}
             onRename={renameFav} onDelete={(id) => deleteFavourite(id).then(refreshFavs)}
           />
         </section>
@@ -268,7 +290,8 @@ export default function App() {
             <button className="mapclose" onClick={() => setMapTarget(null)}>✕ back to explore</button>
           )}
           <BusMap target={mapTarget} stops={stops} buses={areaBuses} active={tab === 'map'}
-            onPickPoint={onPickPoint} onMapMove={onMapMove} onAlarmStop={onAlarmStop} center={exploreCenter} />
+            onPickPoint={onPickPoint} onMapMove={onMapMove} onAlarmStop={onAlarmStop}
+            onQuickAlarm={quickAlarm} onQuickAlarmBus={quickAlarmAtBus} center={exploreCenter} />
         </section>
 
         <section className="pane pane-nearby">
@@ -279,9 +302,8 @@ export default function App() {
           {stops.map((s) => (
             <StopCard key={s.id} stop={s} onShowBus={onShowBus} onShowRoute={onShowRoute}
               onFavourite={onFavourite} onFavouriteBus={onFavouriteBus}
-              onCreateStationAlarm={onCreateStationAlarm}
-              autoAlarm={alarmStopId === s.id} onAutoAlarmHandled={() => setAlarmStopId(null)}
-              watched={watched} toggleWatch={toggleWatch} />
+              onCreateStationAlarm={onCreateStationAlarm} onQuickAlarm={quickAlarm}
+              autoAlarm={alarmStopId === s.id} onAutoAlarmHandled={() => setAlarmStopId(null)} />
           ))}
         </section>
       </div>

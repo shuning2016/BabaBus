@@ -63,9 +63,31 @@ function InvalidateOnActive({ active }) {
   return null;
 }
 
+/** Popup DOM for a moving bus: label + 🔔 quick-alarm button (raw Leaflet
+ *  markers can't host JSX, so the popup is built by hand). */
+function busPopupContent(bus, onQuickAlarmBus) {
+  const div = document.createElement('div');
+  const label = document.createElement('div');
+  label.style.cssText = 'font-size:12px;color:#172B4D';
+  label.innerHTML = `<strong>Bus ${bus.service_no}</strong> — heading to ${bus.toward}`;
+  div.appendChild(label);
+  if (onQuickAlarmBus) {
+    const btn = document.createElement('button');
+    btn.textContent = '🔔 Alarm this bus (next 30 min)';
+    btn.style.cssText = `margin-top:8px;width:100%;background:${ORANGE};color:#fff;border:none;border-radius:8px;padding:6px 10px;font-family:inherit;font-weight:700;font-size:12px;cursor:pointer`;
+    btn.onclick = () => {
+      btn.textContent = '✅ Alarm set — watching its next stop';
+      btn.disabled = true;
+      onQuickAlarmBus(bus);
+    };
+    div.appendChild(btn);
+  }
+  return div;
+}
+
 /** Live buses rendered as Leaflet markers that tween smoothly toward each
  *  new position (requestAnimationFrame) so they appear to drive along roads. */
-function AnimatedBuses({ buses }) {
+function AnimatedBuses({ buses, onQuickAlarmBus }) {
   const map = useMap();
   const store = useRef(new Map()); // id -> { marker, from, to, start }
 
@@ -90,17 +112,18 @@ function AnimatedBuses({ buses }) {
     const seen = new Set();
     buses.forEach((b) => {
       seen.add(b.id);
-      const label = `Bus ${b.service_no} — heading to ${b.toward}`;
       const existing = store.current.get(b.id);
       if (existing) {
         const cur = existing.marker.getLatLng();
         existing.from = { lat: cur.lat, lon: cur.lng };
         existing.to = { lat: b.lat, lon: b.lon };
         existing.start = performance.now();
-        existing.marker.setPopupContent(label);
+        if (!existing.marker.isPopupOpen()) {
+          existing.marker.setPopupContent(busPopupContent(b, onQuickAlarmBus));
+        }
       } else {
         const marker = L.marker([b.lat, b.lon], { icon: busChipIcon(b.service_no), zIndexOffset: 500 })
-          .bindPopup(label)
+          .bindPopup(busPopupContent(b, onQuickAlarmBus))
           .addTo(map);
         store.current.set(b.id, {
           marker, from: { lat: b.lat, lon: b.lon }, to: { lat: b.lat, lon: b.lon }, start: performance.now(),
@@ -159,7 +182,10 @@ function StopArrivalsPopup({ stop, onAlarmStop }) {
   );
 }
 
-export default function BusMap({ target, stops = [], buses = [], active = true, onPickPoint, onMapMove, onAlarmStop, center }) {
+export default function BusMap({
+  target, stops = [], buses = [], active = true,
+  onPickPoint, onMapMove, onAlarmStop, onQuickAlarm, onQuickAlarmBus, center,
+}) {
   const explore = !target;
   const points = explore
     ? (center ? [center] : stops.map((s) => [s.lat, s.lon]))
@@ -184,7 +210,7 @@ export default function BusMap({ target, stops = [], buses = [], active = true, 
       {explore && center && (
         <Marker position={center} icon={placeIcon}><Popup>Selected location</Popup></Marker>
       )}
-      {explore && <AnimatedBuses buses={buses} />}
+      {explore && <AnimatedBuses buses={buses} onQuickAlarmBus={onQuickAlarmBus} />}
       {explore && stops.map((s) => (
         <CircleMarker key={s.id} center={[s.lat, s.lon]} radius={6}
           pathOptions={{ color: ORANGE, weight: 3, fillColor: '#fff', fillOpacity: 1 }}>
@@ -194,7 +220,19 @@ export default function BusMap({ target, stops = [], buses = [], active = true, 
       {!explore && target.type === 'bus' &&
         target.positions.map((p, i) => (
           <Marker key={i} position={[p.lat, p.lon]} icon={busIcon}>
-            <Popup>Bus {target.serviceNo} → {target.stopName}</Popup>
+            <Popup>
+              <div style={{ fontSize: 12 }}>Bus {target.serviceNo} → {target.stopName}</div>
+              {onQuickAlarm && (
+                <button
+                  style={{ marginTop: 8, width: '100%', background: ORANGE, color: '#fff', border: 'none', borderRadius: 8, padding: '6px 10px', fontFamily: 'inherit', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}
+                  onClick={(e) => {
+                    e.currentTarget.textContent = '✅ Alarm set';
+                    onQuickAlarm(target.serviceNo, target.stopId, target.stopName);
+                  }}>
+                  🔔 Alarm this bus (next 30 min)
+                </button>
+              )}
+            </Popup>
           </Marker>
         ))}
       {!explore && target.type === 'route' && (

@@ -17,6 +17,14 @@ export const isWithinWindow = (nowMin, start, end) => {
 
 export const minutesNow = (d = new Date()) => d.getHours() * 60 + d.getMinutes();
 
+const pad = (n) => String(n).padStart(2, '0');
+
+// Minutes-since-midnight → "HH:MM", wrapping past midnight.
+export const toHHMM = (mins) => {
+  const m = ((mins % 1440) + 1440) % 1440;
+  return `${pad(Math.floor(m / 60))}:${pad(m % 60)}`;
+};
+
 // Day mask is 7 chars, index 0=Monday … 6=Sunday. JS getDay() is Sun=0, so shift.
 export const mondayIndex = (d = new Date()) => (d.getDay() + 6) % 7;
 
