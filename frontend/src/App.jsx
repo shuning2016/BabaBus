@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { addFavourite, addSchedule, deleteFavourite, getArrivals, getFavourites, getHealth, getNearby, getRoute, getSchedules, renameFavourite } from './api';
+import { addFavourite, addSchedule, deleteFavourite, getArrivals, getFavourites, getHealth, getMe, getNearby, getRoute, getSchedules, renameFavourite, signOut } from './api';
 import SearchBar from './components/SearchBar';
 import StopCard from './components/StopCard';
 import BusMap from './components/BusMap';
@@ -9,6 +9,7 @@ import FloatingAlarms from './components/FloatingAlarms';
 import NotificationHelp from './components/NotificationHelp';
 import AccountButton from './components/AccountButton';
 import { deviceId } from './device';
+import { sessionToken, setSessionToken } from './session';
 import useAlarms from './useAlarms';
 import useInstallPrompt from './useInstallPrompt';
 import usePush from './usePush';
@@ -67,6 +68,7 @@ export default function App() {
   const [schedules, setSchedules] = useState([]);
   const [tab, setTab] = useState('fav'); // default page = Favourite
   const [showNotifHelp, setShowNotifHelp] = useState(false);
+  const [account, setAccount] = useState(null);
   const activeAlarms = useAlarms(schedules);
   const { canInstall, install } = useInstallPrompt();
   const push = usePush();
@@ -76,8 +78,23 @@ export default function App() {
   const refreshFavs = () => getFavourites().then((d) => setFavourites(d.favourites));
   const refreshSchedules = () => getSchedules().then((d) => setSchedules(d.schedules));
 
+  const onSignedIn = (token, acct) => {
+    setSessionToken(token);      // subsequent requests now scope to the account
+    setAccount(acct);
+    refreshFavs();               // data was migrated server-side — re-fetch it
+    refreshSchedules();
+  };
+  const onSignedOut = () => {
+    signOut().catch(() => {});
+    setSessionToken(null);
+    setAccount(null);
+    refreshFavs();
+    refreshSchedules();
+  };
+
   useEffect(() => {
     getHealth().then((h) => setMode(h.mode)).catch(() => setMode('offline'));
+    if (sessionToken()) getMe().then((r) => setAccount(r.account)).catch(() => setSessionToken(null));
     loadNearby();
     refreshFavs();
     refreshSchedules();
@@ -270,7 +287,7 @@ export default function App() {
           onPickPlace={onPickPlace}
         />
         {canInstall && <button className="installbtn" onClick={install}>⬇ Install</button>}
-        <AccountButton deviceId={deviceId()} mode={mode} />
+        <AccountButton deviceId={deviceId()} mode={mode} account={account} onSignedIn={onSignedIn} onSignedOut={onSignedOut} />
       </header>
 
       <div className="content">

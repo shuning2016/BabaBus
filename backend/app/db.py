@@ -146,6 +146,28 @@ def init_db(path: Optional[str] = None) -> None:
             _run(f"ALTER TABLE {table} ADD COLUMN owner TEXT", path=path)
         except sqlite3.OperationalError:
             pass
+    # Registered accounts (social sign-in) and their opaque session tokens.
+    _run(
+        """CREATE TABLE IF NOT EXISTS accounts (
+            id TEXT PRIMARY KEY,
+            provider TEXT NOT NULL,
+            provider_uid TEXT NOT NULL,
+            email TEXT,
+            name TEXT,
+            image TEXT,
+            created_at INTEGER,
+            UNIQUE(provider, provider_uid)
+        )""",
+        path=path,
+    )
+    _run(
+        """CREATE TABLE IF NOT EXISTS sessions (
+            token TEXT PRIMARY KEY,
+            account_id TEXT NOT NULL,
+            created_at INTEGER
+        )""",
+        path=path,
+    )
 
 
 def list_favourites(owner: str, path: Optional[str] = None) -> list[dict]:
@@ -260,3 +282,65 @@ def delete_schedule(schedule_id: int, owner: str, path: Optional[str] = None) ->
     return _run(
         "DELETE FROM schedules WHERE id = ? AND owner = ?", (schedule_id, owner), path=path
     )["rowcount"] > 0
+
+
+# --- Accounts & sessions -------------------------------------------------
+
+def get_account(account_id: str, path: Optional[str] = None) -> Optional[dict]:
+    rows = _run("SELECT * FROM accounts WHERE id = ?", (account_id,), path=path)["rows"]
+    return rows[0] if rows else None
+
+
+def get_account_by_provider(provider: str, provider_uid: str, path: Optional[str] = None) -> Optional[dict]:
+    rows = _run(
+        "SELECT * FROM accounts WHERE provider = ? AND provider_uid = ?",
+        (provider, provider_uid),
+        path=path,
+    )["rows"]
+    return rows[0] if rows else None
+
+
+def upsert_account(
+    new_id: str, provider: str, provider_uid: str, email, name, image, created_at: int,
+    path: Optional[str] = None,
+) -> str:
+    """Return the account id, creating the row on first sign-in and refreshing
+    the profile (email/name/image) on subsequent ones."""
+    existing = get_account_by_provider(provider, provider_uid, path=path)
+    if existing:
+        _run(
+            "UPDATE accounts SET email = ?, name = ?, image = ? WHERE id = ?",
+            (email, name, image, existing["id"]),
+            path=path,
+        )
+        return existing["id"]
+    _run(
+        "INSERT INTO accounts (id, provider, provider_uid, email, name, image, created_at)"
+        " VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (new_id, provider, provider_uid, email, name, image, created_at),
+        path=path,
+    )
+    return new_id
+
+
+def create_session(token: str, account_id: str, created_at: int, path: Optional[str] = None) -> None:
+    _run(
+        "INSERT INTO sessions (token, account_id, created_at) VALUES (?, ?, ?)",
+        (token, account_id, created_at),
+        path=path,
+    )
+
+
+def get_session_account_id(token: str, path: Optional[str] = None) -> Optional[str]:
+    rows = _run("SELECT account_id FROM sessions WHERE token = ?", (token,), path=path)["rows"]
+    return rows[0]["account_id"] if rows else None
+
+
+def delete_session(token: str, path: Optional[str] = None) -> bool:
+    return _run("DELETE FROM sessions WHERE token = ?", (token,), path=path)["rowcount"] > 0
+
+
+def migrate_owner(from_owner: str, to_owner: str, path: Optional[str] = None) -> None:
+    """Reassign a device's favourites/alarms/subscriptions to an account on sign-in."""
+    for table in ("favourites", "schedules", "push_subscriptions"):
+        _run(f"UPDATE {table} SET owner = ? WHERE owner = ?", (to_owner, from_owner), path=path)
