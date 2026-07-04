@@ -76,7 +76,7 @@ function AlarmRow({ s, live, onChanged }) {
 
       <div className="alarmtimes">
         <span className="muted">Remind phone every</span>
-        <select value={s.remind_every || 4} onChange={(e) => patch({ remind_every: Number(e.target.value) })}>
+        <select value={s.remind_every || 1} onChange={(e) => patch({ remind_every: Number(e.target.value) })}>
           {[1, 2, 3, 4, 5, 10, 15].map((n) => <option key={n} value={n}>{n} min</option>)}
         </select>
       </div>

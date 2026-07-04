@@ -89,7 +89,7 @@ def tick(secret: str = Query("")):
             continue
         if not active_on(s.get("days") or "1111111", weekday):
             continue
-        every = s.get("remind_every") or 4
+        every = s.get("remind_every") or 1
         last = s.get("last_push")
         if last is not None and now_epoch - last < every * 60 - 20:
             continue
