@@ -7,6 +7,8 @@ import FavouritesPanel from './components/FavouritesPanel';
 import AlarmsPanel from './components/AlarmsPanel';
 import FloatingAlarms from './components/FloatingAlarms';
 import NotificationHelp from './components/NotificationHelp';
+import AccountButton from './components/AccountButton';
+import { deviceId } from './device';
 import useAlarms from './useAlarms';
 import useInstallPrompt from './useInstallPrompt';
 import usePush from './usePush';
@@ -268,16 +270,8 @@ export default function App() {
           onPickPlace={onPickPlace}
         />
         {canInstall && <button className="installbtn" onClick={install}>⬇ Install</button>}
-        <span className={`badge ${mode}`}>{mode.toUpperCase()}</span>
+        <AccountButton deviceId={deviceId()} mode={mode} />
       </header>
-
-      <nav className="tabbar">
-        {TABS.map((t) => (
-          <button key={t.id} className={tab === t.id ? 'on' : ''} onClick={() => setTab(t.id)}>
-            <span className="ti">{t.icon}</span><span className="tl">{t.label}</span>
-          </button>
-        ))}
-      </nav>
 
       <div className="content">
         <section className="pane pane-fav">
@@ -325,6 +319,14 @@ export default function App() {
           ))}
         </section>
       </div>
+
+      <nav className="tabbar">
+        {TABS.map((t) => (
+          <button key={t.id} className={tab === t.id ? 'on' : ''} onClick={() => setTab(t.id)}>
+            <span className="ti">{t.icon}</span><span className="tl">{t.label}</span>
+          </button>
+        ))}
+      </nav>
     </div>
   );
 }
