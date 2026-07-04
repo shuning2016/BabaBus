@@ -74,8 +74,15 @@ h1, h2, h3, h4 { margin: 0; }
 
 .row { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-top: 1px solid var(--line); }
 .svc-chip {
-  background: var(--shopee-orange); color: #fff; border: none; cursor: pointer; font-family: inherit;
-  font-size: 13px; border-radius: 8px; padding: 4px 10px; font-weight: 700; min-width: 44px; text-align: center; flex: none;
+  background: var(--shopee-orange); color: #fff; border: 1.5px solid var(--shopee-orange);
+  cursor: pointer; font-family: inherit;
+  font-size: 13px; border-radius: 8px; padding: 3px 9px; font-weight: 700; min-width: 44px; text-align: center; flex: none;
+}
+.svc-chip.off { background: #fff; color: var(--muted); border-color: var(--line); }
+.showall {
+  display: block; width: 100%; background: none; border: none; border-top: 1px solid var(--line);
+  color: var(--bright-blue); font-family: inherit; font-size: 12px; font-weight: 700;
+  padding: 9px 0 2px; cursor: pointer; text-align: center;
 }
 .etas { display: flex; align-items: baseline; gap: 10px; flex: 1; min-width: 0; }
 .eta { cursor: pointer; font-weight: 500; color: var(--muted); font-size: 13px; }

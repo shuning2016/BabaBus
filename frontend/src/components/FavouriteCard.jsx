@@ -12,11 +12,13 @@ const POLL_MS = 15000;
  * The ⏰ opens the station alarm form (bus favourites preselect their bus).
  */
 export default function FavouriteCard({
-  fav, onShowBus, onShowRoute, onCreateStationAlarm, onQuickAlarm, onRename, onDelete,
+  fav, onShowBus, onShowRoute, onCreateStationAlarm,
+  watchedBuses, onToggleWatchBus, onQuickAlarm, onRename, onDelete,
 }) {
   const [data, setData] = useState(null);
   const [error, setError] = useState(false);
   const [alarming, setAlarming] = useState(false);
+  const [showAll, setShowAll] = useState(false);
   const isBus = !!fav.service_no;
 
   useEffect(() => {
@@ -30,9 +32,18 @@ export default function FavouriteCard({
     return () => { alive = false; clearInterval(timer); };
   }, [fav.stop_id]);
 
-  const services = data
-    ? (isBus ? data.services.filter((s) => s.service_no === fav.service_no) : data.services)
-    : [];
+  const isWatching = (s) => watchedBuses?.has(`${fav.stop_id}:${s.service_no}`);
+  let services = [];
+  let hiddenCount = 0;
+  if (data) {
+    if (isBus) {
+      services = data.services.filter((s) => s.service_no === fav.service_no);
+    } else {
+      const watching = data.services.filter(isWatching);
+      services = showAll || watching.length === 0 ? data.services : watching;
+      hiddenCount = watching.length > 0 ? data.services.length - watching.length : 0;
+    }
+  }
 
   return (
     <div className="card">
@@ -65,8 +76,14 @@ export default function FavouriteCard({
       {services.map((svc) => (
         <ArrivalRow key={svc.service_no} svc={svc} stopId={fav.stop_id} stopName={data.stop_name}
           onShowBus={onShowBus} onShowRoute={onShowRoute} onQuickAlarm={onQuickAlarm}
-          showSave={false} />
+          watching={isWatching(svc)}
+          onToggleWatch={(no) => onToggleWatchBus(fav.stop_id, data.stop_name, no)} />
       ))}
+      {!isBus && hiddenCount > 0 && (
+        <button className="showall" onClick={() => setShowAll(!showAll)}>
+          {showAll ? '▲ Only my watching buses' : `▼ Show all ${data.services.length} buses`}
+        </button>
+      )}
     </div>
   );
 }

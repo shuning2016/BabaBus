@@ -194,10 +194,19 @@ export default function App() {
     addFavourite({ stop_id: stopObj.id, custom_name: name, group_name: group }).then(refreshFavs);
   };
 
-  const onFavouriteBus = (stopObj, serviceNo) => {
-    const name = window.prompt('Name this bus:', `Bus ${serviceNo} @ ${stopObj.name}`);
-    if (!name) return;
-    addFavourite({ stop_id: stopObj.id, custom_name: name, group_name: 'My Buses', service_no: serviceNo }).then(refreshFavs);
+  // "My watching buses" = bus favourites (My Buses). Chip clicks toggle membership.
+  const watchKey = (stopId, serviceNo) => `${stopId}:${serviceNo}`;
+  const busFavs = favourites.filter((f) => f.service_no);
+  const watchedBuses = new Set(busFavs.map((f) => watchKey(f.stop_id, f.service_no)));
+  const watchedIds = new Map(busFavs.map((f) => [watchKey(f.stop_id, f.service_no), f.id]));
+
+  const onToggleWatchBus = (stopId, stopName, serviceNo) => {
+    const key = watchKey(stopId, serviceNo);
+    if (watchedBuses.has(key)) return deleteFavourite(watchedIds.get(key)).then(refreshFavs);
+    return addFavourite({
+      stop_id: stopId, custom_name: `${serviceNo} @ ${stopName}`,
+      group_name: 'My Buses', service_no: serviceNo,
+    }).then(refreshFavs);
   };
 
   const requestNotif = () => {
@@ -275,6 +284,7 @@ export default function App() {
           <FavouritesPanel
             favourites={favourites}
             onShowBus={onShowBus} onShowRoute={onShowRoute}
+            watchedBuses={watchedBuses} onToggleWatchBus={onToggleWatchBus}
             onCreateStationAlarm={onCreateStationAlarm} onQuickAlarm={quickAlarm}
             onRename={renameFav} onDelete={(id) => deleteFavourite(id).then(refreshFavs)}
           />
@@ -297,6 +307,7 @@ export default function App() {
           )}
           <BusMap target={mapTarget} stops={stops} buses={areaBuses} active={tab === 'map'}
             onPickPoint={onPickPoint} onMapMove={onMapMove} onAlarmStop={onAlarmStop}
+            watchedBuses={watchedBuses} onToggleWatchBus={onToggleWatchBus}
             onQuickAlarm={quickAlarm} onQuickAlarmBus={quickAlarmAtBus} center={exploreCenter} />
         </section>
 
@@ -307,7 +318,8 @@ export default function App() {
           </div>
           {stops.map((s) => (
             <StopCard key={s.id} stop={s} onShowBus={onShowBus} onShowRoute={onShowRoute}
-              onFavourite={onFavourite} onFavouriteBus={onFavouriteBus}
+              onFavourite={onFavourite}
+              watchedBuses={watchedBuses} onToggleWatchBus={onToggleWatchBus}
               onCreateStationAlarm={onCreateStationAlarm} onQuickAlarm={quickAlarm}
               autoAlarm={alarmStopId === s.id} onAutoAlarmHandled={() => setAlarmStopId(null)} />
           ))}

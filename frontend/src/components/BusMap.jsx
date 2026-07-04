@@ -143,10 +143,12 @@ function AnimatedBuses({ buses, onQuickAlarmBus }) {
   return null;
 }
 
-/** Popup body that loads a station's live arrivals when opened. */
-function StopArrivalsPopup({ stop, onAlarmStop }) {
+/** Popup body that loads a station's live arrivals when opened. Shows only
+ *  "my watching buses" by default; chips toggle watching in/out. */
+function StopArrivalsPopup({ stop, onAlarmStop, watchedBuses, onToggleWatchBus }) {
   const [services, setServices] = useState(null);
   const [error, setError] = useState(false);
+  const [showAll, setShowAll] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -156,21 +158,41 @@ function StopArrivalsPopup({ stop, onAlarmStop }) {
     return () => { alive = false; };
   }, [stop.id]);
 
+  const isWatching = (s) => watchedBuses?.has(`${stop.id}:${s.service_no}`);
+  const watching = (services || []).filter(isWatching);
+  const visible = services ? (showAll || watching.length === 0 ? services : watching) : [];
+
   return (
-    <div style={{ minWidth: 180 }}>
+    <div style={{ minWidth: 190 }}>
       <strong style={{ color: '#172B4D' }}>{stop.name}</strong>{' '}
       <span style={{ color: '#8794AD', fontSize: 11 }}>{stop.id}</span>
       {error && <div style={{ fontSize: 12 }}>Couldn't load arrivals</div>}
       {!services && !error && <div style={{ fontSize: 12 }}>Loading arrivals…</div>}
       {services && services.length === 0 && <div style={{ fontSize: 12 }}>No services here</div>}
-      {services && services.map((s) => (
+      {visible.map((s) => (
         <div key={s.service_no} style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 12, marginTop: 5 }}>
-          <span style={{ background: ORANGE, color: '#fff', borderRadius: 6, padding: '1px 7px', fontWeight: 700, minWidth: 34, textAlign: 'center' }}>
+          <button
+            title={isWatching(s) ? 'Watching — click to remove' : 'Click to add to my watching buses'}
+            onClick={() => onToggleWatchBus && onToggleWatchBus(stop.id, stop.name, s.service_no)}
+            style={{
+              background: isWatching(s) ? ORANGE : '#fff',
+              color: isWatching(s) ? '#fff' : '#8794AD',
+              border: isWatching(s) ? `1.5px solid ${ORANGE}` : '1.5px solid #E3E6EC',
+              borderRadius: 6, padding: '1px 7px', fontWeight: 700, minWidth: 34,
+              textAlign: 'center', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12,
+            }}>
             {s.service_no}
-          </span>
+          </button>
           <span>{s.etas.map((e) => (e <= 0 ? 'Arr' : `${e}m`)).join(' · ') || 'no timing'}</span>
         </div>
       ))}
+      {services && watching.length > 0 && watching.length < services.length && (
+        <button
+          style={{ marginTop: 6, background: 'none', border: 'none', color: '#0080C6', fontFamily: 'inherit', fontSize: 11, fontWeight: 700, cursor: 'pointer', padding: 0 }}
+          onClick={() => setShowAll(!showAll)}>
+          {showAll ? '▲ Only my watching buses' : `▼ Show all ${services.length} buses`}
+        </button>
+      )}
       {onAlarmStop && (
         <button
           style={{ marginTop: 10, width: '100%', background: ORANGE, color: '#fff', border: 'none', borderRadius: 8, padding: '7px 10px', fontFamily: 'inherit', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}
@@ -184,7 +206,8 @@ function StopArrivalsPopup({ stop, onAlarmStop }) {
 
 export default function BusMap({
   target, stops = [], buses = [], active = true,
-  onPickPoint, onMapMove, onAlarmStop, onQuickAlarm, onQuickAlarmBus, center,
+  onPickPoint, onMapMove, onAlarmStop, onQuickAlarm, onQuickAlarmBus,
+  watchedBuses, onToggleWatchBus, center,
 }) {
   const explore = !target;
   const points = explore
@@ -214,7 +237,8 @@ export default function BusMap({
       {explore && stops.map((s) => (
         <CircleMarker key={s.id} center={[s.lat, s.lon]} radius={6}
           pathOptions={{ color: ORANGE, weight: 3, fillColor: '#fff', fillOpacity: 1 }}>
-          <Popup><StopArrivalsPopup stop={s} onAlarmStop={onAlarmStop} /></Popup>
+          <Popup><StopArrivalsPopup stop={s} onAlarmStop={onAlarmStop}
+            watchedBuses={watchedBuses} onToggleWatchBus={onToggleWatchBus} /></Popup>
         </CircleMarker>
       ))}
       {!explore && target.type === 'bus' &&
@@ -241,7 +265,8 @@ export default function BusMap({
           {target.route.stops.map((s) => (
             <CircleMarker key={s.id} center={[s.lat, s.lon]} radius={5}
               pathOptions={{ color: ORANGE, weight: 3, fillColor: '#fff', fillOpacity: 1 }}>
-              <Popup><StopArrivalsPopup stop={s} onAlarmStop={onAlarmStop} /></Popup>
+              <Popup><StopArrivalsPopup stop={s} onAlarmStop={onAlarmStop}
+                watchedBuses={watchedBuses} onToggleWatchBus={onToggleWatchBus} /></Popup>
             </CircleMarker>
           ))}
         </>

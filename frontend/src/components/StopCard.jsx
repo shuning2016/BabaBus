@@ -6,13 +6,15 @@ import AlarmForm from './AlarmForm';
 const POLL_MS = 15000;
 
 export default function StopCard({
-  stop, onShowBus, onShowRoute, onFavourite, onFavouriteBus, onCreateStationAlarm,
-  onQuickAlarm, defaultOpen = false, autoAlarm = false, onAutoAlarmHandled,
+  stop, onShowBus, onShowRoute, onFavourite, onCreateStationAlarm,
+  watchedBuses, onToggleWatchBus, onQuickAlarm,
+  defaultOpen = false, autoAlarm = false, onAutoAlarmHandled,
 }) {
   const [open, setOpen] = useState(defaultOpen);
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
   const [alarming, setAlarming] = useState(false);
+  const [showAll, setShowAll] = useState(false);
 
   // Arriving from elsewhere (e.g. the map popup's "Set alarm") — open the form.
   useEffect(() => {
@@ -62,16 +64,29 @@ export default function StopCard({
           onCancel={() => setAlarming(false)}
         />
       )}
-      {open && data && (
-        <>
-          {data.stale && <p className="stale">⚠ showing last known timings</p>}
-          {data.services.map((svc) => (
-            <ArrivalRow key={svc.service_no} svc={svc} stopId={stop.id} stopName={data.stop_name}
-              onShowBus={onShowBus} onShowRoute={onShowRoute}
-              onFavouriteBus={onFavouriteBus} onQuickAlarm={onQuickAlarm} />
-          ))}
-        </>
-      )}
+      {open && data && (() => {
+        const isWatching = (s) => watchedBuses?.has(`${stop.id}:${s.service_no}`);
+        const watchingRows = data.services.filter(isWatching);
+        // No watched buses here → show everything so the stop isn't empty
+        const visible = showAll || watchingRows.length === 0 ? data.services : watchingRows;
+        return (
+          <>
+            {data.stale && <p className="stale">⚠ showing last known timings</p>}
+            {visible.map((svc) => (
+              <ArrivalRow key={svc.service_no} svc={svc} stopId={stop.id} stopName={data.stop_name}
+                onShowBus={onShowBus} onShowRoute={onShowRoute}
+                watching={isWatching(svc)}
+                onToggleWatch={(no) => onToggleWatchBus(stop.id, data.stop_name, no)}
+                onQuickAlarm={onQuickAlarm} />
+            ))}
+            {watchingRows.length > 0 && watchingRows.length < data.services.length && (
+              <button className="showall" onClick={() => setShowAll(!showAll)}>
+                {showAll ? '▲ Only my watching buses' : `▼ Show all ${data.services.length} buses`}
+              </button>
+            )}
+          </>
+        );
+      })()}
     </div>
   );
 }

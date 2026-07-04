@@ -2,14 +2,13 @@ import { useState } from 'react';
 import CapacityBar from './CapacityBar';
 
 /**
- * One service's live arrivals row — shared by the Nearby stop cards and the
- * Favourite cards so both look identical. Trailing actions are opt-in.
- * 🔔 = quick alarm: monitor this bus at this stop from now to +30 min.
+ * One service's live arrivals row — shared by stop cards and favourite cards.
+ * Chip click toggles the bus in/out of "my watching buses" (orange = watching).
+ * 🔔 = quick alarm (this bus, this stop, now → +30 min). 🗺️ = route on map.
  */
 export default function ArrivalRow({
   svc, stopId, stopName,
-  onShowBus, onShowRoute, onFavouriteBus, onQuickAlarm,
-  showSave = true,
+  onShowBus, onShowRoute, onToggleWatch, watching, onQuickAlarm,
 }) {
   const [ringing, setRinging] = useState(false);
 
@@ -22,8 +21,10 @@ export default function ArrivalRow({
 
   return (
     <div className="row">
-      <button className="svc-chip" title="View route on map"
-        onClick={() => onShowRoute(svc.service_no)}>
+      <button
+        className={`svc-chip ${watching ? '' : 'off'}`}
+        title={watching ? 'Watching — click to remove from my buses' : 'Click to add to my watching buses'}
+        onClick={() => onToggleWatch && onToggleWatch(svc.service_no)}>
         {svc.service_no}
       </button>
       <div className="etas">
@@ -39,10 +40,8 @@ export default function ArrivalRow({
       </div>
       <CapacityBar load={svc.load} />
       <div className="rowactions">
-        {showSave && onFavouriteBus && (
-          <button className="plain" title="Save this bus to Favourites"
-            onClick={() => onFavouriteBus({ id: stopId, name: stopName }, svc.service_no)}>⭐</button>
-        )}
+        <button className="plain" title="View route on map"
+          onClick={() => onShowRoute(svc.service_no)}>🗺️</button>
         {onQuickAlarm && (
           <button className="plain" title="Alarm this bus here for the next 30 min"
             onClick={ring}>{ringing ? '✅' : '🔔'}</button>
