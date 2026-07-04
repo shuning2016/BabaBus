@@ -105,6 +105,42 @@ def test_tick_noop_without_subscribers(monkeypatch):
     assert body["subscribers"] == 0 and body["pushed"] == []
 
 
+def _make_vapid_b64() -> str:
+    """Generate a throwaway VAPID private key as base64-of-PKCS8-PEM."""
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric import ec
+    import base64 as _b64
+
+    key = ec.generate_private_key(ec.SECP256R1())
+    pem = key.private_bytes(
+        serialization.Encoding.PEM,
+        serialization.PrivateFormat.PKCS8,
+        serialization.NoEncryption(),
+    )
+    return _b64.b64encode(pem).decode()
+
+
+def test_send_web_push_loads_vapid_key(monkeypatch):
+    """Regression: pywebpush 2.x funnels a PEM *string* through Vapid.from_string,
+    which strips newlines and fails to parse it — every push then silently errors.
+    send_web_push must build a Vapid object from the base64-of-PEM key instead."""
+    from py_vapid import Vapid
+
+    from app import push as push_mod
+
+    monkeypatch.setattr(settings, "vapid_private_b64", _make_vapid_b64())
+    captured = {}
+    monkeypatch.setattr(push_mod, "webpush", lambda **kw: captured.update(kw))
+
+    # Must not raise (old code raised ValueError deserializing the key here).
+    push_mod.send_web_push(
+        {"endpoint": "https://push.example/x", "p256dh": "k", "auth": "a"},
+        {"title": "t", "body": "b"},
+    )
+    # And it must hand webpush a real Vapid signer, not a raw string.
+    assert isinstance(captured["vapid_private_key"], Vapid)
+
+
 def test_remind_every_persists():
     created = client.post("/api/schedules", json={
         "stop_id": "01029", "service_no": "7", "start_time": "06:40", "end_time": "07:00", "remind_every": 2,
