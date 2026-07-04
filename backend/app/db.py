@@ -118,11 +118,18 @@ def init_db(path: Optional[str] = None) -> None:
         ("remind_every", "INTEGER NOT NULL DEFAULT 4"),
         ("last_push", "INTEGER"),
         ("days", "TEXT NOT NULL DEFAULT '1111111'"),  # Mon..Sun mask
+        ("services", "TEXT NOT NULL DEFAULT ''"),  # CSV of monitored bus nos; '' = all buses
     ):
         try:
             _run(f"ALTER TABLE schedules ADD COLUMN {col} {decl}", path=path)
         except sqlite3.OperationalError:
             pass
+    # Backfill the multi-service column from the legacy single service_no once.
+    _run(
+        "UPDATE schedules SET services = service_no "
+        "WHERE (services IS NULL OR services = '') AND service_no IS NOT NULL AND service_no != ''",
+        path=path,
+    )
     _run(
         """CREATE TABLE IF NOT EXISTS push_subscriptions (
             endpoint TEXT PRIMARY KEY,
@@ -168,7 +175,7 @@ def list_schedules(path: Optional[str] = None) -> list[dict]:
 
 def add_schedule(
     stop_id: str,
-    service_no: str,
+    services: str,  # CSV of bus numbers; '' = all buses at the stop
     start_time: str,
     end_time: str,
     label: str = "",
@@ -176,10 +183,12 @@ def add_schedule(
     days: str = "1111111",
     path: Optional[str] = None,
 ) -> int:
+    # service_no is legacy + NOT NULL; keep it populated with the first service.
+    first = services.split(",")[0] if services else ""
     return _run(
-        "INSERT INTO schedules (stop_id, service_no, start_time, end_time, label, remind_every, days)"
-        " VALUES (?, ?, ?, ?, ?, ?, ?)",
-        (stop_id, service_no, start_time, end_time, label, remind_every, days),
+        "INSERT INTO schedules (stop_id, service_no, services, start_time, end_time, label, remind_every, days)"
+        " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        (stop_id, first, services, start_time, end_time, label, remind_every, days),
         path=path,
     )["lastrowid"]
 

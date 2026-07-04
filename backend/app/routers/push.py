@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from pywebpush import WebPushException
 
 from .. import db
-from ..alarms import active_on, within_window
+from ..alarms import active_on, monitored_services, within_window
 from ..config import settings
 from ..deps import get_datasource
 from ..push import send_web_push
@@ -98,16 +98,21 @@ def tick(secret: str = Query("")):
             arrivals = ds.get_arrivals(s["stop_id"])
         except Exception:
             arrivals = []
-        svc = next((a for a in arrivals if a.service_no == s["service_no"]), None)
-        etas = svc.etas if svc else []
-        if etas:
-            lead = "arriving now" if etas[0] <= 0 else f"{etas[0]} min"
-            rest = f" · then {', '.join(f'{e}m' for e in etas[1:])}" if len(etas) > 1 else ""
-            body = f"{s['label']}: {lead}{rest}"
+        watch = monitored_services(s)  # [] = every bus at the stop
+        rows = [a for a in arrivals if not watch or a.service_no in watch]
+        rows = [a for a in rows if a.etas]
+        rows.sort(key=lambda a: a.etas[0])
+        if rows:
+            parts = [
+                f"{a.service_no}: {'now' if a.etas[0] <= 0 else str(a.etas[0]) + ' min'}"
+                for a in rows[:3]
+            ]
+            body = " · ".join(parts)
         else:
-            body = f"{s['label']}: no live timing right now"
+            body = "no live timing right now"
 
-        _broadcast({"title": f"🚌 Bus {s['service_no']}", "body": body, "tag": f"alarm-{s['id']}"})
+        title = s["label"] or f"🚌 {s['stop_id']}"
+        _broadcast({"title": title, "body": body, "tag": f"alarm-{s['id']}"})
         db.set_last_push(s["id"], now_epoch)
         pushed.append({"id": s["id"], "body": body})
 

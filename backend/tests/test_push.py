@@ -48,7 +48,7 @@ def test_tick_skips_day_that_is_off(monkeypatch):
     today = datetime.now(SGT).weekday()
     days_off_today = "".join("0" if i == today else "1" for i in range(7))
     client.post("/api/schedules", json={
-        "stop_id": "01029", "service_no": "7", "label": "x", "days": days_off_today, **ALL_DAY,
+        "stop_id": "01029", "services": ["7"], "label": "x", "days": days_off_today, **ALL_DAY,
     })
     body = client.post("/api/push/tick", params={"secret": SECRET}).json()
     assert body["pushed"] == [] and sent == []
@@ -56,14 +56,14 @@ def test_tick_skips_day_that_is_off(monkeypatch):
 
 def test_days_persist_and_validate():
     created = client.post("/api/schedules", json={
-        "stop_id": "01029", "service_no": "7", "days": "1111100", **ALL_DAY,
+        "stop_id": "01029", "services": ["7"], "days": "1111100", **ALL_DAY,
     }).json()
     assert created["days"] == "1111100"
     assert client.get("/api/schedules").json()["schedules"][0]["days"] == "1111100"
     assert client.patch(f"/api/schedules/{created['id']}", json={"days": "1010101"}).json() == {"ok": True}
     assert client.get("/api/schedules").json()["schedules"][0]["days"] == "1010101"
     # bad masks rejected
-    assert client.post("/api/schedules", json={"stop_id": "01029", "service_no": "7", "days": "111", **ALL_DAY}).status_code == 422
+    assert client.post("/api/schedules", json={"stop_id": "01029", "services": ["7"], "days": "111", **ALL_DAY}).status_code == 422
     assert client.patch(f"/api/schedules/{created['id']}", json={"days": "12345678"}).status_code == 422
 
 
@@ -85,12 +85,13 @@ def test_tick_pushes_due_alarm_then_respects_interval(monkeypatch):
     monkeypatch.setattr(push_router, "send_web_push", lambda sub, payload: sent.append(payload))
     client.post("/api/push/subscribe", json={"endpoint": "e", "p256dh": "k", "auth": "a"})
     # 01029 is served by service 7 in the demo dataset
-    client.post("/api/schedules", json={"stop_id": "01029", "service_no": "7", "label": "7 @ Natl Lib", **ALL_DAY})
+    client.post("/api/schedules", json={"stop_id": "01029", "services": ["7"], "label": "7 @ Natl Lib", **ALL_DAY})
 
     first = client.post("/api/push/tick", params={"secret": SECRET}).json()
     assert len(first["pushed"]) == 1
     assert len(sent) == 1
-    assert "7 @ Natl Lib" in sent[0]["body"]
+    assert sent[0]["title"] == "7 @ Natl Lib"
+    assert "7:" in sent[0]["body"]  # "7: N min"
 
     # second tick immediately after — interval (4 min) not elapsed, so no push
     second = client.post("/api/push/tick", params={"secret": SECRET}).json()
@@ -98,16 +99,26 @@ def test_tick_pushes_due_alarm_then_respects_interval(monkeypatch):
     assert len(sent) == 1
 
 
+def test_tick_empty_services_pushes_all_buses(monkeypatch):
+    sent = []
+    monkeypatch.setattr(push_router, "send_web_push", lambda sub, payload: sent.append(payload))
+    client.post("/api/push/subscribe", json={"endpoint": "e", "p256dh": "k", "auth": "a"})
+    client.post("/api/schedules", json={"stop_id": "01029", "services": [], "label": "All @ stop", **ALL_DAY})
+    client.post("/api/push/tick", params={"secret": SECRET})
+    assert len(sent) == 1
+    assert sent[0]["body"].count(":") >= 1  # at least one "service: eta"
+
+
 def test_tick_noop_without_subscribers(monkeypatch):
     monkeypatch.setattr(push_router, "send_web_push", lambda sub, payload: None)
-    client.post("/api/schedules", json={"stop_id": "01029", "service_no": "7", "label": "x", **ALL_DAY})
+    client.post("/api/schedules", json={"stop_id": "01029", "services": ["7"], "label": "x", **ALL_DAY})
     body = client.post("/api/push/tick", params={"secret": SECRET}).json()
     assert body["subscribers"] == 0 and body["pushed"] == []
 
 
 def test_remind_every_persists():
     created = client.post("/api/schedules", json={
-        "stop_id": "01029", "service_no": "7", "start_time": "06:40", "end_time": "07:00", "remind_every": 2,
+        "stop_id": "01029", "services": ["7"], "start_time": "06:40", "end_time": "07:00", "remind_every": 2,
     }).json()
     assert created["remind_every"] == 2
     got = client.get("/api/schedules").json()["schedules"][0]

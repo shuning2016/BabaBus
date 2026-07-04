@@ -15,29 +15,30 @@ def temp_db(tmp_path, monkeypatch):
 
 client = TestClient(app)
 
-MORNING_143 = {
+MORNING = {
     "stop_id": "14131",
-    "service_no": "143",
+    "services": ["143", "61"],
     "start_time": "06:40",
     "end_time": "07:00",
-    "label": "Morning 143",
+    "label": "Morning @ Caribbean",
 }
 
 
 def test_schedule_crud_roundtrip():
-    created = client.post("/api/schedules", json=MORNING_143).json()
-    assert created["service_no"] == "143"
+    created = client.post("/api/schedules", json=MORNING).json()
+    assert created["services"] == ["143", "61"]
     assert created["enabled"] is True
 
     listed = client.get("/api/schedules").json()["schedules"]
     assert len(listed) == 1
+    assert listed[0]["services"] == ["143", "61"]
     assert listed[0]["start_time"] == "06:40"
-    assert listed[0]["enabled"] is True
 
+    # edit monitored buses
     assert client.patch(
-        f"/api/schedules/{created['id']}", json={"enabled": False}
+        f"/api/schedules/{created['id']}", json={"services": ["143", "61", "131"]}
     ).json() == {"ok": True}
-    assert client.get("/api/schedules").json()["schedules"][0]["enabled"] is False
+    assert client.get("/api/schedules").json()["schedules"][0]["services"] == ["143", "61", "131"]
 
     assert client.patch(
         f"/api/schedules/{created['id']}", json={"start_time": "06:30", "end_time": "07:15"}
@@ -49,16 +50,30 @@ def test_schedule_crud_roundtrip():
     assert client.get("/api/schedules").json()["schedules"] == []
 
 
+def test_empty_services_means_all_buses():
+    created = client.post("/api/schedules", json={**MORNING, "services": []}).json()
+    assert created["services"] == []
+    assert client.get("/api/schedules").json()["schedules"][0]["services"] == []
+
+
+def test_legacy_single_service_backfills_to_list():
+    # simulate a pre-refactor row that only had service_no
+    db.add_schedule("14131", "", "06:40", "07:00", "legacy")
+    db._run("UPDATE schedules SET services = '', service_no = '99'")
+    got = client.get("/api/schedules").json()["schedules"][0]
+    assert got["services"] == ["99"]  # falls back to legacy service_no
+
+
 def test_schedules_sorted_by_start_time():
-    client.post("/api/schedules", json={**MORNING_143, "start_time": "18:00", "end_time": "18:30"})
-    client.post("/api/schedules", json=MORNING_143)
+    client.post("/api/schedules", json={**MORNING, "start_time": "18:00", "end_time": "18:30"})
+    client.post("/api/schedules", json=MORNING)
     starts = [s["start_time"] for s in client.get("/api/schedules").json()["schedules"]]
     assert starts == ["06:40", "18:00"]
 
 
 def test_invalid_time_rejected():
     for bad in ("6:40", "24:00", "06:60", "0640", "morning"):
-        res = client.post("/api/schedules", json={**MORNING_143, "start_time": bad})
+        res = client.post("/api/schedules", json={**MORNING, "start_time": bad})
         assert res.status_code == 422, bad
 
 
@@ -68,5 +83,5 @@ def test_missing_schedule_404():
 
 
 def test_empty_patch_rejected():
-    created = client.post("/api/schedules", json=MORNING_143).json()
+    created = client.post("/api/schedules", json=MORNING).json()
     assert client.patch(f"/api/schedules/{created['id']}", json={}).status_code == 422

@@ -5,6 +5,7 @@ import StopCard from './components/StopCard';
 import BusMap from './components/BusMap';
 import FavouritesPanel from './components/FavouritesPanel';
 import AlarmsPanel from './components/AlarmsPanel';
+import FloatingAlarms from './components/FloatingAlarms';
 import useWatch from './useWatch';
 import useAlarms from './useAlarms';
 import useInstallPrompt from './useInstallPrompt';
@@ -218,13 +219,24 @@ export default function App() {
     }
   };
 
+  const requestNotif = () => {
+    if (typeof Notification !== 'undefined' && Notification.permission === 'default') Notification.requestPermission();
+  };
+
+  // Quick single-bus alarm (from a favourite bus row)
   const onCreateAlarm = (stopObj, serviceNo) => {
     const start = askTime(`Watch bus ${serviceNo} at ${stopObj.name} from (HH:MM):`, '06:40');
     if (!start) return;
     const end = askTime('until (HH:MM):', '07:00');
     if (!end) return;
-    if (typeof Notification !== 'undefined' && Notification.permission === 'default') Notification.requestPermission();
-    addSchedule({ stop_id: stopObj.id, service_no: serviceNo, start_time: start, end_time: end, label: `${serviceNo} @ ${stopObj.name}` }).then(refreshSchedules);
+    requestNotif();
+    addSchedule({ stop_id: stopObj.id, services: [serviceNo], start_time: start, end_time: end, label: `${serviceNo} @ ${stopObj.name}` }).then(refreshSchedules);
+  };
+
+  // Full station alarm (from a stop's "Set alarm" form) — payload already shaped
+  const onCreateStationAlarm = (payload) => {
+    requestNotif();
+    return addSchedule(payload).then(() => { refreshSchedules(); setTab('alarms'); });
   };
 
   const toggleAutoWatch = (fav) => {
@@ -244,16 +256,9 @@ export default function App() {
     if (name) renameFavourite(id, name).then(refreshFavs);
   };
 
-  const AlarmBanners = () => activeAlarms.map(({ schedule: s, stopName, etas }) => (
-    <div className="alarmbanner" key={s.id}>
-      ⏰ Bus <strong>{s.service_no}</strong> at {stopName}:{' '}
-      {etas.length ? <strong>{etas[0] <= 0 ? 'arriving now' : `${etas[0]} min`}</strong> : 'no live timing yet'}
-      {etas.length > 1 && <span> · then {etas.slice(1).map((e) => `${e} min`).join(', ')}</span>}
-    </div>
-  ));
-
   return (
     <div className={`app tab-${tab}`}>
+      <FloatingAlarms active={activeAlarms} onOpenAlarms={() => setTab('alarms')} />
       <header className="header">
         <h1>🚌 BabaBus</h1>
         <SearchBar
@@ -275,7 +280,6 @@ export default function App() {
 
       <div className="content">
         <section className="pane pane-fav">
-          <AlarmBanners />
           <FavouritesPanel
             favourites={favourites}
             onShowBus={onShowBus} onShowRoute={onShowRoute} onCreateAlarm={onCreateAlarm}
@@ -301,14 +305,14 @@ export default function App() {
         </section>
 
         <section className="pane pane-nearby">
-          <AlarmBanners />
           <div className="paneheader">
             <h2>{heading}</h2>
             <button className="pill" onClick={loadNearby}>📍 Near me</button>
           </div>
           {stops.map((s) => (
             <StopCard key={s.id} stop={s} onShowBus={onShowBus} onShowRoute={onShowRoute}
-              onFavourite={onFavourite} onFavouriteBus={onFavouriteBus} onCreateAlarm={onCreateAlarm}
+              onFavourite={onFavourite} onFavouriteBus={onFavouriteBus}
+              onCreateStationAlarm={onCreateStationAlarm}
               watched={watched} toggleWatch={toggleWatch} />
           ))}
         </section>
