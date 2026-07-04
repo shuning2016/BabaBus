@@ -6,6 +6,7 @@ import BusMap from './components/BusMap';
 import FavouritesPanel from './components/FavouritesPanel';
 import AlarmsPanel from './components/AlarmsPanel';
 import FloatingAlarms from './components/FloatingAlarms';
+import NotificationHelp from './components/NotificationHelp';
 import useWatch from './useWatch';
 import useAlarms from './useAlarms';
 import useInstallPrompt from './useInstallPrompt';
@@ -74,6 +75,7 @@ export default function App() {
   const [areaBuses, setAreaBuses] = useState([]);
   const [schedules, setSchedules] = useState([]);
   const [tab, setTab] = useState('fav'); // default page = Favourite
+  const [showNotifHelp, setShowNotifHelp] = useState(false);
   const { watched, toggleWatch } = useWatch();
   const activeAlarms = useAlarms(schedules);
   const { canInstall, install } = useInstallPrompt();
@@ -258,6 +260,7 @@ export default function App() {
 
   return (
     <div className={`app tab-${tab}`}>
+      {showNotifHelp && <NotificationHelp onClose={() => setShowNotifHelp(false)} />}
       <FloatingAlarms active={activeAlarms} onOpenAlarms={() => setTab('alarms')} />
       <header className="header">
         <h1>🚌 BabaBus</h1>
@@ -293,6 +296,9 @@ export default function App() {
             <h2>Bus Alarms</h2>
           </div>
           <PushBanner push={push} />
+          <button className="linkbtn notifhelp" onClick={() => setShowNotifHelp(true)}>
+            🔔 通知没弹出？点这里设置手机 · Alarm not popping up?
+          </button>
           <AlarmsPanel schedules={schedules} active={activeAlarms} onChanged={refreshSchedules} />
         </section>
 
