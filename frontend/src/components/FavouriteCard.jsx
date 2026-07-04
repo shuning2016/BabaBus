@@ -10,7 +10,7 @@ const POLL_MS = 15000;
  *  - stop favourite → every service at the stop, like the stop view
  */
 export default function FavouriteCard({
-  fav, onShowBus, onShowRoute, onCreateAlarm, onRename, onDelete, watched, toggleWatch,
+  fav, onShowBus, onShowRoute, onRename, onDelete, watched, toggleWatch,
 }) {
   const [data, setData] = useState(null);
   const [error, setError] = useState(false);
@@ -49,7 +49,7 @@ export default function FavouriteCard({
       )}
       {services.map((svc) => (
         <ArrivalRow key={svc.service_no} svc={svc} stopId={fav.stop_id} stopName={data.stop_name}
-          onShowBus={onShowBus} onShowRoute={onShowRoute} onCreateAlarm={onCreateAlarm}
+          onShowBus={onShowBus} onShowRoute={onShowRoute}
           watched={watched} toggleWatch={toggleWatch} showSave={false} />
       ))}
     </div>

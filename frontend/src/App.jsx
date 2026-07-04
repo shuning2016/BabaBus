@@ -10,7 +10,6 @@ import useWatch from './useWatch';
 import useAlarms from './useAlarms';
 import useInstallPrompt from './useInstallPrompt';
 import usePush from './usePush';
-import { HHMM_RE } from './alarmClock';
 import { approxMetres, assignBusIds } from './geo';
 
 const DEFAULT_CENTER = { lat: 1.2975, lon: 103.854 }; // Bugis — demo dataset area
@@ -210,30 +209,11 @@ export default function App() {
     addFavourite({ stop_id: stopObj.id, custom_name: name, group_name: 'My Buses', service_no: serviceNo }).then(refreshFavs);
   };
 
-  const askTime = (message, fallback) => {
-    for (;;) {
-      const t = window.prompt(message, fallback);
-      if (t === null) return null;
-      if (HHMM_RE.test(t.trim())) return t.trim();
-      fallback = t;
-    }
-  };
-
   const requestNotif = () => {
     if (typeof Notification !== 'undefined' && Notification.permission === 'default') Notification.requestPermission();
   };
 
-  // Quick single-bus alarm (from a favourite bus row)
-  const onCreateAlarm = (stopObj, serviceNo) => {
-    const start = askTime(`Watch bus ${serviceNo} at ${stopObj.name} from (HH:MM):`, '06:40');
-    if (!start) return;
-    const end = askTime('until (HH:MM):', '07:00');
-    if (!end) return;
-    requestNotif();
-    addSchedule({ stop_id: stopObj.id, services: [serviceNo], start_time: start, end_time: end, label: `${serviceNo} @ ${stopObj.name}` }).then(refreshSchedules);
-  };
-
-  // Full station alarm (from a stop's "Set alarm" form) — payload already shaped
+  // Station alarm (stop → time slot → buses), created from a stop's ⏰ form
   const onCreateStationAlarm = (payload) => {
     requestNotif();
     return addSchedule(payload).then(() => { refreshSchedules(); setTab('alarms'); });
@@ -282,7 +262,7 @@ export default function App() {
         <section className="pane pane-fav">
           <FavouritesPanel
             favourites={favourites}
-            onShowBus={onShowBus} onShowRoute={onShowRoute} onCreateAlarm={onCreateAlarm}
+            onShowBus={onShowBus} onShowRoute={onShowRoute}
             onRename={renameFav} onDelete={(id) => deleteFavourite(id).then(refreshFavs)}
             watched={watched} toggleWatch={toggleAutoWatch}
           />

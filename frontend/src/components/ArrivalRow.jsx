@@ -6,8 +6,8 @@ import CapacityBar from './CapacityBar';
  */
 export default function ArrivalRow({
   svc, stopId, stopName,
-  onShowBus, onShowRoute, onFavouriteBus, onCreateAlarm, watched, toggleWatch,
-  showSave = true, showWatch = true, showAlarm = true,
+  onShowBus, onShowRoute, onFavouriteBus, watched, toggleWatch,
+  showSave = true, showWatch = true,
 }) {
   return (
     <div className="row">
@@ -36,10 +36,6 @@ export default function ArrivalRow({
           <button className="plain" title="Notify me when it's arriving"
             style={{ opacity: watched(stopId, svc.service_no) ? 1 : 0.35 }}
             onClick={() => toggleWatch(stopId, svc.service_no)}>🔔</button>
-        )}
-        {showAlarm && onCreateAlarm && (
-          <button className="plain" title="Watch this bus at set times every day"
-            onClick={() => onCreateAlarm({ id: stopId, name: stopName }, svc.service_no)}>⏰</button>
         )}
       </div>
     </div>
