@@ -1,13 +1,13 @@
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel
 from pywebpush import WebPushException
 
 from .. import db
 from ..alarms import active_on, monitored_services, within_window
 from ..config import settings
-from ..deps import get_datasource
+from ..deps import get_datasource, get_owner
 from ..push import send_web_push
 
 SGT = timezone(timedelta(hours=8))
@@ -33,13 +33,13 @@ def vapid_key():
 
 
 @router.post("/subscribe")
-def subscribe(sub: SubIn):
-    db.add_subscription(sub.endpoint, sub.p256dh, sub.auth)
+def subscribe(sub: SubIn, owner: str = Depends(get_owner)):
+    db.add_subscription(sub.endpoint, sub.p256dh, sub.auth, owner=owner)
     return {"ok": True}
 
 
 @router.post("/unsubscribe")
-def unsubscribe(sub: UnsubIn):
+def unsubscribe(sub: UnsubIn, owner: str = Depends(get_owner)):
     db.delete_subscription(sub.endpoint)
     return {"ok": True}
 
@@ -71,9 +71,11 @@ def _guard(secret: str):
 
 
 @router.post("/test")
-def test_push(secret: str = Query("")):
+def test_push(secret: str = Query(""), x_device_id: str | None = Header(default=None)):
     _guard(secret)
-    return {"sent": _broadcast({"title": "🚌 BabaBus", "body": "Push notifications are working!"})}
+    # Scope to the calling device when it sends its id; otherwise notify everyone.
+    subs = db.list_subscriptions(x_device_id) if x_device_id else None
+    return {"sent": _broadcast({"title": "🚌 BabaBus", "body": "Push notifications are working!"}, subs)}
 
 
 @router.post("/tick")
@@ -87,9 +89,13 @@ def tick(secret: str = Query("")):
     weekday = now.weekday()  # Mon=0 … Sun=6
     now_epoch = int(now.timestamp())
 
-    subs = db.list_subscriptions()
-    if not subs:
+    all_subs = db.list_subscriptions()
+    if not all_subs:
         return {"now": now.strftime("%H:%M"), "subscribers": 0, "pushed": []}
+    # Each alarm is only pushed to its own device's subscriptions.
+    subs_by_owner: dict = {}
+    for sub in all_subs:
+        subs_by_owner.setdefault(sub.get("owner"), []).append(sub)
 
     ds = get_datasource()
     pushed = []
@@ -102,6 +108,9 @@ def tick(secret: str = Query("")):
         last = s.get("last_push")
         if last is not None and now_epoch - last < every * 60 - 20:
             continue
+        owner_subs = subs_by_owner.get(s.get("owner"), [])
+        if not owner_subs:
+            continue  # this device has no push subscription to notify
 
         try:
             arrivals = ds.get_arrivals(s["stop_id"])
@@ -127,7 +136,7 @@ def tick(secret: str = Query("")):
         apple_seen = s.get("last_apple_push")
         apple_gap = max(every, APPLE_MIN_MINUTES) * 60 - 20
         apple_due = bool(rows) and (apple_seen is None or now_epoch - apple_seen >= apple_gap)
-        targets = [x for x in subs if apple_due or not _is_apple(x["endpoint"])]
+        targets = [x for x in owner_subs if apple_due or not _is_apple(x["endpoint"])]
         if not targets:
             continue
 
@@ -138,4 +147,4 @@ def tick(secret: str = Query("")):
             db.set_last_apple_push(s["id"], now_epoch)
         pushed.append({"id": s["id"], "body": body})
 
-    return {"now": now.strftime("%H:%M"), "subscribers": len(subs), "pushed": pushed}
+    return {"now": now.strftime("%H:%M"), "subscribers": len(all_subs), "pushed": pushed}

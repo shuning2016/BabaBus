@@ -1,8 +1,9 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from .. import db
 from ..alarms import monitored_services
+from ..deps import get_owner
 
 router = APIRouter(prefix="/api/schedules")
 
@@ -35,21 +36,21 @@ class ScheduleUpdate(BaseModel):
 
 
 @router.get("")
-def list_all():
-    return {"schedules": [shape(r) for r in db.list_schedules()]}
+def list_all(owner: str = Depends(get_owner)):
+    return {"schedules": [shape(r) for r in db.list_schedules(owner)]}
 
 
 @router.post("")
-def create(s: ScheduleIn):
+def create(s: ScheduleIn, owner: str = Depends(get_owner)):
     csv = ",".join(s.services)
     schedule_id = db.add_schedule(
-        s.stop_id, csv, s.start_time, s.end_time, s.label, s.remind_every, s.days
+        s.stop_id, csv, s.start_time, s.end_time, s.label, s.remind_every, s.days, owner=owner
     )
     return {"id": schedule_id, "enabled": True, **s.model_dump()}
 
 
 @router.patch("/{schedule_id}")
-def update(schedule_id: int, body: ScheduleUpdate):
+def update(schedule_id: int, body: ScheduleUpdate, owner: str = Depends(get_owner)):
     fields = body.model_dump(exclude_none=True)
     if not fields:
         raise HTTPException(422, "Nothing to update")
@@ -57,13 +58,13 @@ def update(schedule_id: int, body: ScheduleUpdate):
         services = fields.pop("services")
         fields["services"] = ",".join(services)
         fields["service_no"] = services[0] if services else ""
-    if not db.update_schedule(schedule_id, fields):
+    if not db.update_schedule(schedule_id, fields, owner):
         raise HTTPException(404, "Schedule not found")
     return {"ok": True}
 
 
 @router.delete("/{schedule_id}")
-def remove(schedule_id: int):
-    if not db.delete_schedule(schedule_id):
+def remove(schedule_id: int, owner: str = Depends(get_owner)):
+    if not db.delete_schedule(schedule_id, owner):
         raise HTTPException(404, "Schedule not found")
     return {"ok": True}

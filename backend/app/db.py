@@ -139,10 +139,19 @@ def init_db(path: Optional[str] = None) -> None:
         )""",
         path=path,
     )
+    # Per-device ownership: each anonymous device scopes its own favourites,
+    # alarms and push subscriptions. Pre-existing rows keep owner = NULL.
+    for table in ("favourites", "schedules", "push_subscriptions"):
+        try:
+            _run(f"ALTER TABLE {table} ADD COLUMN owner TEXT", path=path)
+        except sqlite3.OperationalError:
+            pass
 
 
-def list_favourites(path: Optional[str] = None) -> list[dict]:
-    return _run("SELECT * FROM favourites ORDER BY group_name, id", path=path)["rows"]
+def list_favourites(owner: str, path: Optional[str] = None) -> list[dict]:
+    return _run(
+        "SELECT * FROM favourites WHERE owner = ? ORDER BY group_name, id", (owner,), path=path
+    )["rows"]
 
 
 def add_favourite(
@@ -150,27 +159,39 @@ def add_favourite(
     custom_name: str,
     group_name: str,
     service_no: Optional[str] = None,
+    owner: Optional[str] = None,
     path: Optional[str] = None,
 ) -> int:
     return _run(
-        "INSERT INTO favourites (stop_id, custom_name, group_name, service_no) VALUES (?, ?, ?, ?)",
-        (stop_id, custom_name, group_name, service_no),
+        "INSERT INTO favourites (stop_id, custom_name, group_name, service_no, owner)"
+        " VALUES (?, ?, ?, ?, ?)",
+        (stop_id, custom_name, group_name, service_no, owner),
         path=path,
     )["lastrowid"]
 
 
-def delete_favourite(fav_id: int, path: Optional[str] = None) -> bool:
-    return _run("DELETE FROM favourites WHERE id = ?", (fav_id,), path=path)["rowcount"] > 0
-
-
-def rename_favourite(fav_id: int, custom_name: str, path: Optional[str] = None) -> bool:
+def delete_favourite(fav_id: int, owner: str, path: Optional[str] = None) -> bool:
     return _run(
-        "UPDATE favourites SET custom_name = ? WHERE id = ?", (custom_name, fav_id), path=path
+        "DELETE FROM favourites WHERE id = ? AND owner = ?", (fav_id, owner), path=path
     )["rowcount"] > 0
 
 
-def list_schedules(path: Optional[str] = None) -> list[dict]:
-    rows = _run("SELECT * FROM schedules ORDER BY start_time, id", path=path)["rows"]
+def rename_favourite(fav_id: int, custom_name: str, owner: str, path: Optional[str] = None) -> bool:
+    return _run(
+        "UPDATE favourites SET custom_name = ? WHERE id = ? AND owner = ?",
+        (custom_name, fav_id, owner),
+        path=path,
+    )["rowcount"] > 0
+
+
+def list_schedules(owner: Optional[str] = None, path: Optional[str] = None) -> list[dict]:
+    # owner=None returns every schedule (used by the cron tick across all devices).
+    if owner is None:
+        rows = _run("SELECT * FROM schedules ORDER BY start_time, id", path=path)["rows"]
+    else:
+        rows = _run(
+            "SELECT * FROM schedules WHERE owner = ? ORDER BY start_time, id", (owner,), path=path
+        )["rows"]
     return [{**r, "enabled": bool(r["enabled"])} for r in rows]
 
 
@@ -182,14 +203,15 @@ def add_schedule(
     label: str = "",
     remind_every: int = 1,
     days: str = "1111111",
+    owner: Optional[str] = None,
     path: Optional[str] = None,
 ) -> int:
     # service_no is legacy + NOT NULL; keep it populated with the first service.
     first = services.split(",")[0] if services else ""
     return _run(
-        "INSERT INTO schedules (stop_id, service_no, services, start_time, end_time, label, remind_every, days)"
-        " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-        (stop_id, first, services, start_time, end_time, label, remind_every, days),
+        "INSERT INTO schedules (stop_id, service_no, services, start_time, end_time, label, remind_every, days, owner)"
+        " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (stop_id, first, services, start_time, end_time, label, remind_every, days, owner),
         path=path,
     )["lastrowid"]
 
@@ -202,32 +224,39 @@ def set_last_apple_push(schedule_id: int, epoch: int, path: Optional[str] = None
     _run("UPDATE schedules SET last_apple_push = ? WHERE id = ?", (epoch, schedule_id), path=path)
 
 
-def add_subscription(endpoint: str, p256dh: str, auth: str, path: Optional[str] = None) -> None:
+def add_subscription(
+    endpoint: str, p256dh: str, auth: str, owner: Optional[str] = None, path: Optional[str] = None
+) -> None:
     _run(
-        "INSERT OR REPLACE INTO push_subscriptions (endpoint, p256dh, auth) VALUES (?, ?, ?)",
-        (endpoint, p256dh, auth),
+        "INSERT OR REPLACE INTO push_subscriptions (endpoint, p256dh, auth, owner) VALUES (?, ?, ?, ?)",
+        (endpoint, p256dh, auth, owner),
         path=path,
     )
 
 
-def list_subscriptions(path: Optional[str] = None) -> list[dict]:
-    return _run("SELECT * FROM push_subscriptions", path=path)["rows"]
+def list_subscriptions(owner: Optional[str] = None, path: Optional[str] = None) -> list[dict]:
+    # owner=None returns every subscription (the tick groups them by owner).
+    if owner is None:
+        return _run("SELECT * FROM push_subscriptions", path=path)["rows"]
+    return _run("SELECT * FROM push_subscriptions WHERE owner = ?", (owner,), path=path)["rows"]
 
 
 def delete_subscription(endpoint: str, path: Optional[str] = None) -> bool:
     return _run("DELETE FROM push_subscriptions WHERE endpoint = ?", (endpoint,), path=path)["rowcount"] > 0
 
 
-def update_schedule(schedule_id: int, fields: dict, path: Optional[str] = None) -> bool:
+def update_schedule(schedule_id: int, fields: dict, owner: str, path: Optional[str] = None) -> bool:
     if not fields:
         return False
     cols = ", ".join(f"{k} = ?" for k in fields)
     return _run(
-        f"UPDATE schedules SET {cols} WHERE id = ?",
-        (*fields.values(), schedule_id),
+        f"UPDATE schedules SET {cols} WHERE id = ? AND owner = ?",
+        (*fields.values(), schedule_id, owner),
         path=path,
     )["rowcount"] > 0
 
 
-def delete_schedule(schedule_id: int, path: Optional[str] = None) -> bool:
-    return _run("DELETE FROM schedules WHERE id = ?", (schedule_id,), path=path)["rowcount"] > 0
+def delete_schedule(schedule_id: int, owner: str, path: Optional[str] = None) -> bool:
+    return _run(
+        "DELETE FROM schedules WHERE id = ? AND owner = ?", (schedule_id, owner), path=path
+    )["rowcount"] > 0

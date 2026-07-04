@@ -1,11 +1,16 @@
 // Dev: separate uvicorn on :8000. Web production (Vercel): same-origin /api.
 // Native builds (Capacitor iOS/Android) have no same-origin backend, so they
 // set VITE_API_BASE to the hosted API at build time.
+import { deviceId } from './device';
+
 const BASE =
   import.meta.env.VITE_API_BASE ?? (import.meta.env.DEV ? 'http://localhost:8000' : '');
 
-async function j(path, opts) {
-  const res = await fetch(`${BASE}${path}`, opts);
+async function j(path, opts = {}) {
+  const res = await fetch(`${BASE}${path}`, {
+    ...opts,
+    headers: { 'X-Device-Id': deviceId(), ...(opts.headers || {}) },
+  });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
     throw new Error(body.detail || res.statusText);
