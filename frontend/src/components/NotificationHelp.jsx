@@ -1,12 +1,20 @@
 import { useState } from 'react';
+import { Capacitor } from '@capacitor/core';
+import { NativeSettings, AndroidSettings, IOSSettings } from 'capacitor-native-settings';
 
-// Which app actually owns the push subscription: the browser (PWA lives inside
-// Chrome) or an installed standalone BabaBus. We can't open OS settings from the
-// web, so this sheet walks the user there — brand by brand, since Chinese Android
-// skins bury the two settings that matter (floating banner + battery) in
-// different places and are the usual reason alarms land silently or not at all.
+// In the installed native app we can deep-link straight to the OS settings
+// screens via intents. On the plain web page there's no such API, so we fall
+// back to a brand-by-brand walkthrough (Chinese Android skins bury the two
+// settings that matter — floating banner + battery — in different places).
 
-const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+const native = Capacitor.isNativePlatform();
+const platform = Capacitor.getPlatform(); // 'android' | 'ios' | 'web'
+const isIOSweb = /iphone|ipad|ipod/i.test(navigator.userAgent);
+
+const openNotificationSettings = () =>
+  NativeSettings.open({ optionAndroid: AndroidSettings.AppNotification, optionIOS: IOSSettings.App }).catch(() => {});
+const openBatterySettings = () =>
+  NativeSettings.open({ optionAndroid: AndroidSettings.BatteryOptimization, optionIOS: IOSSettings.App }).catch(() => {});
 
 const ANDROID_BRANDS = [
   {
@@ -47,9 +55,66 @@ const ANDROID_BRANDS = [
   },
 ];
 
-export default function NotificationHelp({ target = 'Chrome', onClose }) {
-  const [brand, setBrand] = useState(ANDROID_BRANDS[0]);
+function NativeButtons() {
+  return (
+    <>
+      <div className="stepblock">
+        <h4>1 · Show as a floating banner 横幅</h4>
+        <p>Open BabaBus's notification settings, then turn on <strong>悬浮通知 / 横幅 (Banner)</strong> and set importance to <strong>高 / High</strong>.</p>
+        <button className="pill sheet-jump" onClick={openNotificationSettings}>➡️ Open notification settings</button>
+      </div>
+      {platform === 'android' && (
+        <div className="stepblock">
+          <h4>2 · Keep alarms alive when closed 后台/电池</h4>
+          <p>Open battery settings and set BabaBus to <strong>无限制 / Don't optimize</strong> so it can still remind you when closed.</p>
+          <button className="pill sheet-jump" onClick={openBatterySettings}>➡️ Open battery settings</button>
+          <p className="muted small">Also open Recent apps and 🔒 lock BabaBus so the system won't kill it.</p>
+        </div>
+      )}
+      {platform === 'ios' && (
+        <p className="sheet-note muted">On iPhone, in that screen turn on <strong>Allow Notifications</strong>, set <strong>Banner Style → Persistent</strong>, and enable Lock Screen + Banners. iOS has no battery setting to change.</p>
+      )}
+    </>
+  );
+}
 
+function WebGuide() {
+  const [brand, setBrand] = useState(ANDROID_BRANDS[0]);
+  if (isIOSweb) {
+    return (
+      <div className="stepblock">
+        <h4>iPhone</h4>
+        <ol>
+          <li>Settings → Notifications → <strong>BabaBus</strong> → <strong>Allow Notifications</strong> on.</li>
+          <li>Set <strong>Banner Style → Persistent</strong>, and turn on <strong>Lock Screen</strong>, <strong>Banners</strong> and <strong>Sounds</strong>.</li>
+          <li>iOS only delivers web push to an <strong>installed</strong> PWA (Safari → Share → Add to Home Screen, iOS 16.4+).</li>
+        </ol>
+      </div>
+    );
+  }
+  return (
+    <>
+      <div className="brandrow">
+        {ANDROID_BRANDS.map((b) => (
+          <button key={b.id} className={`brandbtn ${brand.id === b.id ? 'on' : ''}`} onClick={() => setBrand(b)}>
+            {b.name}
+          </button>
+        ))}
+      </div>
+      <div className="stepblock">
+        <h4>1 · Show as a floating banner 横幅</h4>
+        <p>{brand.banner}</p>
+      </div>
+      <div className="stepblock">
+        <h4>2 · Keep alarms alive when closed 后台/电池</h4>
+        <p>{brand.battery}</p>
+        <p className="muted small">Also open Recent apps and 🔒 lock BabaBus so the system won't kill it.</p>
+      </div>
+    </>
+  );
+}
+
+export default function NotificationHelp({ onClose }) {
   return (
     <div className="sheet-overlay" onClick={onClose}>
       <div className="sheet" onClick={(e) => e.stopPropagation()}>
@@ -59,51 +124,12 @@ export default function NotificationHelp({ target = 'Chrome', onClose }) {
         </div>
 
         <p className="sheet-note">
-          The alarm already reaches your phone (it shows in <strong>通知中心</strong>), but Android
-          needs two settings to make it slide down as a banner <em>and</em> keep working when BabaBus
-          is closed. Your phone won't let an app flip these for you — here's exactly where they are.
-        </p>
-        <p className="sheet-note muted">
-          Pick the app you enabled alarms in — usually <strong>{target}</strong> (or the installed
-          <strong> BabaBus</strong> if you added it to your home screen). 选择你开启闹钟的那个 App。
+          The alarm already reaches your phone (it shows in <strong>通知中心</strong>), but your phone
+          needs a couple of settings to make it slide down as a banner {platform === 'ios' ? '' : 'and keep working when BabaBus is closed'}.
+          {native ? ' Tap a button below to jump straight there.' : " Your phone won't let an app flip these for you — here's exactly where they are."}
         </p>
 
-        {isIOS ? (
-          <div className="stepblock">
-            <h4>iPhone</h4>
-            <ol>
-              <li>Settings → Notifications → <strong>BabaBus</strong> → <strong>Allow Notifications</strong> on.</li>
-              <li>Set <strong>Banner Style → Persistent</strong>, and turn on <strong>Lock Screen</strong>, <strong>Banners</strong> and <strong>Sounds</strong>.</li>
-              <li>iOS only delivers web push to an <strong>installed</strong> PWA (Safari → Share → Add to Home Screen, iOS 16.4+). There's no battery setting to change.</li>
-            </ol>
-          </div>
-        ) : (
-          <>
-            <div className="brandrow">
-              {ANDROID_BRANDS.map((b) => (
-                <button
-                  key={b.id}
-                  className={`brandbtn ${brand.id === b.id ? 'on' : ''}`}
-                  onClick={() => setBrand(b)}
-                >
-                  {b.name}
-                </button>
-              ))}
-            </div>
-
-            <div className="stepblock">
-              <h4>1 · Show as a floating banner 横幅</h4>
-              <p>{brand.banner}</p>
-            </div>
-            <div className="stepblock">
-              <h4>2 · Keep alarms alive when closed 后台/电池</h4>
-              <p>{brand.battery}</p>
-              <p className="muted small">
-                Also open Recent apps and 🔒 lock BabaBus so the system won't kill it.
-              </p>
-            </div>
-          </>
-        )}
+        {native ? <NativeButtons /> : <WebGuide />}
 
         <button className="pill sheet-done" onClick={onClose}>Got it 知道了</button>
       </div>
