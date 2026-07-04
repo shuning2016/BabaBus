@@ -161,3 +161,73 @@ def test_remind_every_persists():
     assert got["remind_every"] == 2
     assert client.patch(f"/api/schedules/{created['id']}", json={"remind_every": 10}).json() == {"ok": True}
     assert client.get("/api/schedules").json()["schedules"][0]["remind_every"] == 10
+
+
+def test_is_apple():
+    from app.routers.push import _is_apple
+
+    assert _is_apple("https://web.push.apple.com/xyz") is True
+    assert _is_apple("https://fcm.googleapis.com/xyz") is False
+
+
+def test_tick_apple_every_5min_android_every_tick(monkeypatch):
+    """iOS banners on every push, so Apple subs are re-alerted at most every 5
+    minutes while Android subs refresh silently on every tick."""
+    class FixedDatetime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return datetime(2026, 7, 4, 8, 0, tzinfo=tz)  # Sat 08:00 SGT, inside ALL_DAY
+
+    monkeypatch.setattr(push_router, "datetime", FixedDatetime)
+    sent_to = []
+    monkeypatch.setattr(push_router, "send_web_push", lambda sub, payload: sent_to.append(sub["endpoint"]))
+    client.post("/api/push/subscribe", json={"endpoint": "https://web.push.apple.com/AAA", "p256dh": "k", "auth": "a"})
+    client.post("/api/push/subscribe", json={"endpoint": "https://fcm.googleapis.com/BBB", "p256dh": "k", "auth": "a"})
+    created = client.post("/api/schedules", json={"stop_id": "01029", "services": ["7"], "label": "x", **ALL_DAY}).json()
+    now = int(datetime(2026, 7, 4, 8, 0, tzinfo=SGT).timestamp())
+
+    # First push reaches both platforms.
+    client.post("/api/push/tick", params={"secret": SECRET})
+    assert any("apple" in e for e in sent_to)
+    assert any("googleapis" in e for e in sent_to)
+
+    # 2 min after the last Apple alert (< 5): Android refreshes, Apple stays quiet.
+    sent_to.clear()
+    db.set_last_push(created["id"], now - 120)
+    db.set_last_apple_push(created["id"], now - 120)
+    client.post("/api/push/tick", params={"secret": SECRET})
+    assert any("googleapis" in e for e in sent_to)
+    assert not any("apple" in e for e in sent_to)
+
+    # 6 min after the last Apple alert (>= 5): Apple banners again.
+    sent_to.clear()
+    db.set_last_push(created["id"], now - 360)
+    db.set_last_apple_push(created["id"], now - 360)
+    client.post("/api/push/tick", params={"secret": SECRET})
+    assert any("apple" in e for e in sent_to)
+
+
+def test_apple_held_back_until_live_timing(monkeypatch):
+    """Apple is alerted only once there's real timing to show — a 'no live
+    timing' tick shouldn't spend an iOS banner on nothing."""
+    class FixedDatetime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return datetime(2026, 7, 4, 8, 0, tzinfo=tz)
+
+    class EmptyDS:
+        def get_arrivals(self, stop_id):
+            return []
+
+    monkeypatch.setattr(push_router, "datetime", FixedDatetime)
+    monkeypatch.setattr(push_router, "get_datasource", lambda: EmptyDS())
+    sent_to = []
+    monkeypatch.setattr(push_router, "send_web_push", lambda sub, payload: sent_to.append(sub["endpoint"]))
+    client.post("/api/push/subscribe", json={"endpoint": "https://web.push.apple.com/AAA", "p256dh": "k", "auth": "a"})
+    client.post("/api/push/subscribe", json={"endpoint": "https://fcm.googleapis.com/BBB", "p256dh": "k", "auth": "a"})
+    client.post("/api/schedules", json={"stop_id": "01029", "services": ["7"], "label": "x", **ALL_DAY})
+
+    client.post("/api/push/tick", params={"secret": SECRET})
+    # No live timing: Android still gets the refresh, Apple is held back for later.
+    assert any("googleapis" in e for e in sent_to)
+    assert not any("apple" in e for e in sent_to)

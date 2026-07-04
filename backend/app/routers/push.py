@@ -11,6 +11,9 @@ from ..deps import get_datasource
 from ..push import send_web_push
 
 SGT = timezone(timedelta(hours=8))
+# iOS shows a banner on every web push (no silent refresh), so re-alert Apple
+# subscriptions no more often than this many minutes; Android refreshes each tick.
+APPLE_MIN_MINUTES = 5
 router = APIRouter(prefix="/api/push")
 
 
@@ -41,9 +44,9 @@ def unsubscribe(sub: UnsubIn):
     return {"ok": True}
 
 
-def _broadcast(payload: dict) -> int:
+def _broadcast(payload: dict, subs: list | None = None) -> int:
     sent = 0
-    for s in db.list_subscriptions():
+    for s in (subs if subs is not None else db.list_subscriptions()):
         try:
             send_web_push(s, payload)
             sent += 1
@@ -54,6 +57,12 @@ def _broadcast(payload: dict) -> int:
         except Exception:
             pass  # transient send failure — keep the sub, retry next tick
     return sent
+
+
+def _is_apple(endpoint: str) -> bool:
+    """Apple/iOS web push must show a banner on every push (no silent update),
+    so we re-alert Apple subscriptions on a gentler cadence than Android."""
+    return endpoint.startswith("https://web.push.apple.com")
 
 
 def _guard(secret: str):
@@ -111,9 +120,22 @@ def tick(secret: str = Query("")):
         else:
             body = "no live timing right now"
 
+        # iOS banners on every push (no silent update), so re-alert Apple subs on
+        # a gentler cadence — at least every APPLE_MIN_MINUTES minutes — while
+        # Android refreshes the same notification silently each tick. Only alert
+        # once there's real timing worth showing.
+        apple_seen = s.get("last_apple_push")
+        apple_gap = max(every, APPLE_MIN_MINUTES) * 60 - 20
+        apple_due = bool(rows) and (apple_seen is None or now_epoch - apple_seen >= apple_gap)
+        targets = [x for x in subs if apple_due or not _is_apple(x["endpoint"])]
+        if not targets:
+            continue
+
         title = s["label"] or f"🚌 {s['stop_id']}"
-        _broadcast({"title": title, "body": body, "tag": f"alarm-{s['id']}"})
+        _broadcast({"title": title, "body": body, "tag": f"alarm-{s['id']}"}, targets)
         db.set_last_push(s["id"], now_epoch)
+        if apple_due:
+            db.set_last_apple_push(s["id"], now_epoch)
         pushed.append({"id": s["id"], "body": body})
 
     return {"now": now.strftime("%H:%M"), "subscribers": len(subs), "pushed": pushed}

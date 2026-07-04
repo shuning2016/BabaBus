@@ -117,6 +117,7 @@ def init_db(path: Optional[str] = None) -> None:
     for col, decl in (
         ("remind_every", "INTEGER NOT NULL DEFAULT 1"),
         ("last_push", "INTEGER"),
+        ("last_apple_push", "INTEGER"),  # iOS is notified once per window, tracked separately
         ("days", "TEXT NOT NULL DEFAULT '1111111'"),  # Mon..Sun mask
         ("services", "TEXT NOT NULL DEFAULT ''"),  # CSV of monitored bus nos; '' = all buses
     ):
@@ -195,6 +196,10 @@ def add_schedule(
 
 def set_last_push(schedule_id: int, epoch: int, path: Optional[str] = None) -> None:
     _run("UPDATE schedules SET last_push = ? WHERE id = ?", (epoch, schedule_id), path=path)
+
+
+def set_last_apple_push(schedule_id: int, epoch: int, path: Optional[str] = None) -> None:
+    _run("UPDATE schedules SET last_apple_push = ? WHERE id = ?", (epoch, schedule_id), path=path)
 
 
 def add_subscription(endpoint: str, p256dh: str, auth: str, path: Optional[str] = None) -> None:
