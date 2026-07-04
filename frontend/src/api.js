@@ -31,7 +31,12 @@ export const renameFavourite = (id, name) =>
   j(`/api/favourites/${id}`, { ...post({ custom_name: name }), method: 'PATCH' });
 export const deleteFavourite = (id) => j(`/api/favourites/${id}`, { method: 'DELETE' });
 export const getSchedules = () => j('/api/schedules');
-export const addSchedule = (body) => j('/api/schedules', post(body));
+// iOS banners on every push (no silent refresh), so new alarms default to a
+// gentler 5-min cadence there; Android refreshes silently every minute. An
+// explicit remind_every in `body` still wins.
+const isIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent);
+export const addSchedule = (body) =>
+  j('/api/schedules', post({ remind_every: isIOS() ? 5 : 1, ...body }));
 export const updateSchedule = (id, body) =>
   j(`/api/schedules/${id}`, { ...post(body), method: 'PATCH' });
 export const deleteSchedule = (id) => j(`/api/schedules/${id}`, { method: 'DELETE' });
