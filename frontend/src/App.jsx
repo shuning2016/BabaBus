@@ -13,16 +13,6 @@ import usePush from './usePush';
 import { approxMetres, assignBusIds } from './geo';
 
 const DEFAULT_CENTER = { lat: 1.2975, lon: 103.854 }; // Bugis — demo dataset area
-const AUTOWATCH_KEY = 'bababus-autowatch';
-
-const autoWatchStore = {
-  read: () => new Set(JSON.parse(localStorage.getItem(AUTOWATCH_KEY) || '[]')),
-  toggle(key) {
-    const stored = this.read();
-    if (stored.has(key)) stored.delete(key); else stored.add(key);
-    localStorage.setItem(AUTOWATCH_KEY, JSON.stringify([...stored]));
-  },
-};
 
 const TABS = [
   { id: 'fav', icon: '⭐', label: 'Favourite' },
@@ -219,17 +209,14 @@ export default function App() {
     return addSchedule(payload).then(() => { refreshSchedules(); setTab('alarms'); });
   };
 
-  const toggleAutoWatch = (fav) => {
-    autoWatchStore.toggle(`${fav.stop_id}:${fav.service_no}`);
-    toggleWatch(fav.stop_id, fav.service_no);
+  // From a map stop popup: jump to the stop's card with the alarm form open
+  const [alarmStopId, setAlarmStopId] = useState(null);
+  const onAlarmStop = (stop) => {
+    setStops([stop]);
+    setHeading(stop.name);
+    setAlarmStopId(stop.id);
+    setTab('nearby');
   };
-
-  useEffect(() => {
-    const stored = autoWatchStore.read();
-    favourites
-      .filter((f) => f.service_no && stored.has(`${f.stop_id}:${f.service_no}`))
-      .forEach((f) => { if (!watched(f.stop_id, f.service_no)) toggleWatch(f.stop_id, f.service_no); });
-  }, [favourites]);
 
   const renameFav = (id) => {
     const name = window.prompt('New name:');
@@ -263,8 +250,8 @@ export default function App() {
           <FavouritesPanel
             favourites={favourites}
             onShowBus={onShowBus} onShowRoute={onShowRoute}
+            onCreateStationAlarm={onCreateStationAlarm}
             onRename={renameFav} onDelete={(id) => deleteFavourite(id).then(refreshFavs)}
-            watched={watched} toggleWatch={toggleAutoWatch}
           />
         </section>
 
@@ -281,7 +268,7 @@ export default function App() {
             <button className="mapclose" onClick={() => setMapTarget(null)}>✕ back to explore</button>
           )}
           <BusMap target={mapTarget} stops={stops} buses={areaBuses} active={tab === 'map'}
-            onPickPoint={onPickPoint} onMapMove={onMapMove} center={exploreCenter} />
+            onPickPoint={onPickPoint} onMapMove={onMapMove} onAlarmStop={onAlarmStop} center={exploreCenter} />
         </section>
 
         <section className="pane pane-nearby">
@@ -293,6 +280,7 @@ export default function App() {
             <StopCard key={s.id} stop={s} onShowBus={onShowBus} onShowRoute={onShowRoute}
               onFavourite={onFavourite} onFavouriteBus={onFavouriteBus}
               onCreateStationAlarm={onCreateStationAlarm}
+              autoAlarm={alarmStopId === s.id} onAutoAlarmHandled={() => setAlarmStopId(null)}
               watched={watched} toggleWatch={toggleWatch} />
           ))}
         </section>

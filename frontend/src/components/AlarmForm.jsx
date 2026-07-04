@@ -10,8 +10,8 @@ const nowMins = () => { const d = new Date(); return d.getHours() * 60 + d.getMi
  * Create a station alarm: pick which buses to monitor, the daily time window
  * and which days. Empty selection = watch every bus at the stop.
  */
-export default function AlarmForm({ stop, services, onCreate, onCancel }) {
-  const [picked, setPicked] = useState(() => new Set(services)); // default: all
+export default function AlarmForm({ stop, services, initialPicked, onCreate, onCancel }) {
+  const [picked, setPicked] = useState(() => new Set(initialPicked ?? services)); // default: all
   const [start, setStart] = useState(hhmm(nowMins()));
   const [end, setEnd] = useState(hhmm(nowMins() + 30));
   const [days, setDays] = useState('1111111');

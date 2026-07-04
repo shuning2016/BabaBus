@@ -7,12 +7,21 @@ const POLL_MS = 15000;
 
 export default function StopCard({
   stop, onShowBus, onShowRoute, onFavourite, onFavouriteBus, onCreateStationAlarm,
-  watched, toggleWatch, defaultOpen = false,
+  watched, toggleWatch, defaultOpen = false, autoAlarm = false, onAutoAlarmHandled,
 }) {
   const [open, setOpen] = useState(defaultOpen);
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
   const [alarming, setAlarming] = useState(false);
+
+  // Arriving from elsewhere (e.g. the map popup's "Set alarm") — open the form.
+  useEffect(() => {
+    if (autoAlarm) {
+      setOpen(true);
+      setAlarming(true);
+      onAutoAlarmHandled?.();
+    }
+  }, [autoAlarm]);
 
   useEffect(() => {
     if (!open) return undefined;

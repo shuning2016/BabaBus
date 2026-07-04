@@ -121,7 +121,7 @@ function AnimatedBuses({ buses }) {
 }
 
 /** Popup body that loads a station's live arrivals when opened. */
-function StopArrivalsPopup({ stop }) {
+function StopArrivalsPopup({ stop, onAlarmStop }) {
   const [services, setServices] = useState(null);
   const [error, setError] = useState(false);
 
@@ -148,11 +148,18 @@ function StopArrivalsPopup({ stop }) {
           <span>{s.etas.map((e) => (e <= 0 ? 'Arr' : `${e}m`)).join(' · ') || 'no timing'}</span>
         </div>
       ))}
+      {onAlarmStop && (
+        <button
+          style={{ marginTop: 10, width: '100%', background: ORANGE, color: '#fff', border: 'none', borderRadius: 8, padding: '7px 10px', fontFamily: 'inherit', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}
+          onClick={() => onAlarmStop(stop)}>
+          ⏰ Set alarm for this stop
+        </button>
+      )}
     </div>
   );
 }
 
-export default function BusMap({ target, stops = [], buses = [], active = true, onPickPoint, onMapMove, center }) {
+export default function BusMap({ target, stops = [], buses = [], active = true, onPickPoint, onMapMove, onAlarmStop, center }) {
   const explore = !target;
   const points = explore
     ? (center ? [center] : stops.map((s) => [s.lat, s.lon]))
@@ -181,7 +188,7 @@ export default function BusMap({ target, stops = [], buses = [], active = true, 
       {explore && stops.map((s) => (
         <CircleMarker key={s.id} center={[s.lat, s.lon]} radius={6}
           pathOptions={{ color: ORANGE, weight: 3, fillColor: '#fff', fillOpacity: 1 }}>
-          <Popup><StopArrivalsPopup stop={s} /></Popup>
+          <Popup><StopArrivalsPopup stop={s} onAlarmStop={onAlarmStop} /></Popup>
         </CircleMarker>
       ))}
       {!explore && target.type === 'bus' &&
@@ -196,7 +203,7 @@ export default function BusMap({ target, stops = [], buses = [], active = true, 
           {target.route.stops.map((s) => (
             <CircleMarker key={s.id} center={[s.lat, s.lon]} radius={5}
               pathOptions={{ color: ORANGE, weight: 3, fillColor: '#fff', fillOpacity: 1 }}>
-              <Popup><StopArrivalsPopup stop={s} /></Popup>
+              <Popup><StopArrivalsPopup stop={s} onAlarmStop={onAlarmStop} /></Popup>
             </CircleMarker>
           ))}
         </>
