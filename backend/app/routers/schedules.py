@@ -20,7 +20,7 @@ class ScheduleIn(BaseModel):
     start_time: str = Field(pattern=HHMM)  # local time, e.g. "06:40"
     end_time: str = Field(pattern=HHMM)
     label: str = ""
-    remind_every: int = Field(default=4, ge=1, le=60)  # push cadence, minutes
+    remind_every: int = Field(default=1, ge=1, le=60)  # push cadence, minutes
     days: str = Field(default="1111111", pattern=DAYS)
 
 

@@ -22,12 +22,15 @@ self.addEventListener('activate', (e) => {
 self.addEventListener('push', (e) => {
   let data = {};
   try { data = e.data ? e.data.json() : {}; } catch { data = {}; }
+  // Same tag => the notification is replaced in place (one entry per alarm,
+  // never a stack). renotify:false => refreshing the bus timing each minute
+  // updates that entry silently instead of re-alerting as a brand-new 通知.
   e.waitUntil(self.registration.showNotification(data.title || 'BabaBus', {
     body: data.body || '',
     icon: '/icon-192.png',
     badge: '/icon-192.png',
     tag: data.tag,
-    renotify: true,
+    renotify: false,
   }));
 });
 
