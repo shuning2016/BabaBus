@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Get BabaBus</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&display=swap" rel="stylesheet" />
+  <style>
+    :root { --orange:#EE4D2D; --red:#F05025; --navy:#172B4D; --yellow:#FCCD34; --muted:#8794AD; --line:#EEF0F4; --bg:#F4F5F7; }
+    * { box-sizing:border-box; }
+    body { margin:0; font-family:'Roboto',sans-serif; background:var(--bg); color:#2B3648; }
+    header { background:linear-gradient(135deg,#EE4D2D,#F05025); color:#fff; padding:26px 20px; text-align:center; }
+    header .logo { font-size:40px; }
+    header h1 { margin:6px 0 2px; font-size:24px; font-weight:900; }
+    header p { margin:0; opacity:.9; font-size:14px; }
+    main { max-width:520px; margin:0 auto; padding:18px 16px 40px; }
+    .card { background:#fff; border-radius:16px; box-shadow:0 2px 12px rgba(23,43,77,.07); padding:20px; margin-bottom:16px; }
+    .card.hi { outline:2px solid var(--orange); }
+    .card h2 { margin:0 0 4px; font-size:18px; color:var(--navy); font-weight:900; }
+    .tag { display:inline-block; background:var(--yellow); color:var(--navy); font-size:11px; font-weight:900; border-radius:999px; padding:2px 10px; margin-bottom:8px; }
+    .btn { display:block; text-align:center; background:var(--orange); color:#fff; text-decoration:none; font-weight:900; padding:14px; border-radius:12px; margin:12px 0 6px; font-size:16px; }
+    ol { margin:8px 0 0; padding-left:20px; line-height:1.7; font-size:14px; }
+    .muted { color:var(--muted); font-size:13px; line-height:1.5; }
+    .kbd { background:var(--bg); border:1px solid var(--line); border-radius:6px; padding:1px 6px; font-weight:700; }
+    footer { text-align:center; color:var(--muted); font-size:12px; padding:0 16px 30px; }
+    a.plain { color:var(--orange); font-weight:700; text-decoration:none; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="logo">🚌</div>
+    <h1>Get BabaBus</h1>
+    <p>Live Singapore bus arrivals, favourites & alarms</p>
+  </header>
+  <main>
+    <div class="card" id="webcard">
+      <span class="tag">WORKS EVERYWHERE</span>
+      <h2>Open the app now</h2>
+      <p class="muted">No download needed — runs in your browser and installs to your home screen.</p>
+      <a class="btn" href="/">Open BabaBus</a>
+    </div>
+
+    <div class="card" id="android">
+      <span class="tag">ANDROID</span>
+      <h2>Install on Android</h2>
+      <p class="muted">Download the app file and open it to install. You may need to allow
+        <span class="kbd">Install unknown apps</span> for your browser the first time.</p>
+      <a class="btn" href="/BabaBus.apk" download>⬇ Download the Android app (.apk)</a>
+      <p class="muted">Prefer no download? Open the app and tap the browser menu →
+        <span class="kbd">Install app</span>.</p>
+    </div>
+
+    <div class="card" id="ios">
+      <span class="tag">IPHONE / IPAD</span>
+      <h2>Install on iPhone</h2>
+      <p class="muted">Apple doesn't allow app-file downloads, so add BabaBus to your Home Screen —
+        it installs like an app, with its own icon and full screen (needed for alarm notifications):</p>
+      <ol>
+        <li>Open <a class="plain" href="/">this page's app</a> in <strong>Safari</strong></li>
+        <li>Tap the <strong>Share</strong> button <span class="kbd">⬆</span></li>
+        <li>Tap <strong>Add to Home Screen</strong></li>
+        <li>Open BabaBus from the new icon</li>
+      </ol>
+    </div>
+  </main>
+  <footer>
+    Made with 🧡 · <a class="plain" href="/">baba-bus.vercel.app</a>
+  </footer>
+  <script>
+    var ua = navigator.userAgent || '';
+    var isiOS = /iphone|ipad|ipod/i.test(ua);
+    var isAndroid = /android/i.test(ua);
+    if (isiOS) document.getElementById('ios').classList.add('hi');
+    else if (isAndroid) document.getElementById('android').classList.add('hi');
+    // Hide the irrelevant platform card on phones to reduce confusion
+    if (isiOS) document.getElementById('android').style.display = 'none';
+    if (isAndroid) document.getElementById('ios').style.display = 'none';
+  </script>
+</body>
+</html>

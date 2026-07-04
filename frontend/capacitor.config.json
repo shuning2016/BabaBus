@@ -2,6 +2,10 @@
   "appId": "com.shuning.bababus",
   "appName": "BabaBus",
   "webDir": "dist",
+  "server": {
+    "url": "https://baba-bus.vercel.app",
+    "cleartext": false
+  },
   "ios": {
     "contentInset": "always"
   }

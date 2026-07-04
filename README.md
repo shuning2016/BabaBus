@@ -63,25 +63,37 @@ Just import the repo at vercel.com — no settings needed.
 
 ## Install on your phone
 
-**Android / desktop Chrome** — open the deployed site and tap the **⬇ Install**
-button in the header (or Chrome menu → "Install app").
+Go to **https://baba-bus.vercel.app/get.html** — a download page that shows
+the right option for your device.
 
-**iPhone, no Mac tooling needed** — Safari → Share → "Add to Home Screen"
-installs the PWA.
+- **Android** — download `BabaBus.apk` and open it to install (allow
+  "install unknown apps" for your browser the first time). Or just open the
+  site and tap Chrome menu → "Install app".
+- **iPhone / iPad** — Apple doesn't allow app-file downloads, so open the
+  site in Safari → Share → **Add to Home Screen**. This installs the PWA and
+  is required for alarm notifications.
 
-**iPhone, native app (Capacitor)** — the repo contains a ready Xcode project
-at `frontend/ios/` (WKWebView shell around the same UI, talking to the hosted
-API). To build it you need Xcode from the Mac App Store, then:
+### Rebuilding the Android APK
+
+The native shell loads the live site (`server.url` in `capacitor.config.json`),
+so a downloaded APK always shows the latest deployment — you rarely rebuild it.
+When you do (icon/config changes), with JDK 17 + Android SDK installed:
 
     cd frontend
-    npm install
-    npm run build:ios      # web bundle with the hosted API baked in
-    npm run ios            # opens the project in Xcode
+    npm run build && npx cap sync android
+    cd android && ./gradlew assembleDebug
+    cp app/build/outputs/apk/debug/app-debug.apk ../public/BabaBus.apk
 
-In Xcode: select the `App` target → Signing & Capabilities → choose your
-Apple ID team (a free account works; apps expire after 7 days, paid
-developer accounts don't), plug in your iPhone, pick it as the run target,
-and press ▶. Dependencies resolve via Swift Package Manager — no CocoaPods.
+Then commit `public/BabaBus.apk` and deploy.
+
+### iPhone native app (Capacitor)
+
+The repo also has a ready Xcode project at `frontend/ios/`. Building an
+installable iOS app needs Xcode + an Apple ID (free works, but apps expire
+after 7 days; a paid account removes that and enables TestFlight). Plain
+link-download installs aren't possible on iOS — use the PWA above instead.
+
+    cd frontend && npm run build:ios && npm run ios   # opens Xcode
 
 ## Tests
 
