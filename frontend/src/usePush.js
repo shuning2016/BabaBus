@@ -27,7 +27,15 @@ export default function usePush() {
     if (Notification.permission === 'denied') { setStatus('denied'); return; }
     navigator.serviceWorker.ready
       .then((reg) => reg.pushManager.getSubscription())
-      .then((sub) => setStatus(sub ? 'on' : 'off'))
+      .then((sub) => {
+        if (sub) {
+          // Re-register so this subscription is bound to the current device id
+          // (heals rows saved before per-device ownership existed).
+          const j = sub.toJSON();
+          subscribePush({ endpoint: j.endpoint, p256dh: j.keys.p256dh, auth: j.keys.auth }).catch(() => {});
+        }
+        setStatus(sub ? 'on' : 'off');
+      })
       .catch(() => setStatus('off'));
   }, [supported]);
 

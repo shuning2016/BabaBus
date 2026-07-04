@@ -13,7 +13,7 @@ def temp_db(tmp_path, monkeypatch):
     yield
 
 
-client = TestClient(app)
+client = TestClient(app, headers={"X-Device-Id": "test-device"})
 
 MORNING = {
     "stop_id": "14131",
@@ -58,10 +58,27 @@ def test_empty_services_means_all_buses():
 
 def test_legacy_single_service_backfills_to_list():
     # simulate a pre-refactor row that only had service_no
-    db.add_schedule("14131", "", "06:40", "07:00", "legacy")
+    db.add_schedule("14131", "", "06:40", "07:00", "legacy", owner="test-device")
     db._run("UPDATE schedules SET services = '', service_no = '99'")
     got = client.get("/api/schedules").json()["schedules"][0]
     assert got["services"] == ["99"]  # falls back to legacy service_no
+
+
+def test_device_isolation():
+    # Two devices keep separate alarm lists.
+    client.post("/api/schedules", json=MORNING, headers={"X-Device-Id": "aaa"})
+    mine = client.get("/api/schedules", headers={"X-Device-Id": "aaa"}).json()["schedules"]
+    theirs = client.get("/api/schedules", headers={"X-Device-Id": "bbb"}).json()["schedules"]
+    assert len(mine) == 1 and theirs == []
+    # device bbb can't delete device aaa's alarm
+    assert client.delete(f"/api/schedules/{mine[0]['id']}", headers={"X-Device-Id": "bbb"}).status_code == 404
+    assert client.delete(f"/api/schedules/{mine[0]['id']}", headers={"X-Device-Id": "aaa"}).json() == {"ok": True}
+
+
+def test_missing_device_id_rejected():
+    bare = TestClient(app)  # no default X-Device-Id
+    assert bare.get("/api/schedules").status_code == 400
+    assert bare.post("/api/schedules", json=MORNING).status_code == 400
 
 
 def test_schedules_sorted_by_start_time():

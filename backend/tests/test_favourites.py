@@ -13,7 +13,7 @@ def temp_db(tmp_path, monkeypatch):
     yield
 
 
-client = TestClient(app)
+client = TestClient(app, headers={"X-Device-Id": "test-device"})
 
 
 def test_favourites_crud_roundtrip():

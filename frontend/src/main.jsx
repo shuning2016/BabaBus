@@ -3,6 +3,9 @@ import ReactDOM from 'react-dom/client';
 import 'leaflet/dist/leaflet.css';
 import './theme.css';
 import App from './App.jsx';
+import { requestPersistentStorage } from './device';
+
+requestPersistentStorage(); // keep this device's favourites/alarms from being evicted
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
