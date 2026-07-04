@@ -119,6 +119,27 @@ button.plain:hover { background: #F4F5F7; }
 .pushbanner { background: #fff; border: 1.5px solid var(--line); border-radius: 12px; padding: 12px 14px; margin-bottom: 14px; font-size: 14px; line-height: 1.5; display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
 .pushbanner.on { background: #FFF7E0; border-color: var(--shopee-yellow); }
 .pushbanner .pill { margin-left: auto; }
+.notifhelp { display: inline-block; margin: -4px 0 14px 2px; text-align: left; }
+
+/* Notification-help sheet (opens the how-to for phone settings) */
+.sheet-overlay { position: fixed; inset: 0; background: rgba(23,43,77,.45); z-index: 5000; display: flex; align-items: flex-end; justify-content: center; }
+.sheet { background: #fff; width: min(520px, 100vw); max-height: 88vh; overflow-y: auto; border-radius: 16px 16px 0 0; padding: 18px 18px 22px; box-shadow: 0 -8px 30px rgba(23,43,77,.25); }
+.sheet-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.sheet-head h3 { font-size: 17px; color: var(--navy); margin: 0; }
+.sheet-x { background: none; border: none; font-size: 18px; color: var(--muted); cursor: pointer; font-family: inherit; padding: 4px 6px; }
+.sheet-note { font-size: 13px; line-height: 1.55; color: var(--ink); margin: 0 0 8px; }
+.sheet-note.muted { color: var(--muted); }
+.brandrow { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 14px; }
+.brandbtn { border: 1.5px solid var(--line); background: #fff; color: var(--navy); border-radius: 999px; padding: 5px 12px; font-family: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
+.brandbtn.on { background: var(--shopee-orange); border-color: var(--shopee-orange); color: #fff; }
+.stepblock { border: 1.5px solid var(--line); border-radius: 12px; padding: 12px 14px; margin-bottom: 10px; }
+.stepblock h4 { margin: 0 0 6px; font-size: 14px; color: var(--shopee-orange); }
+.stepblock p { margin: 0 0 4px; font-size: 13px; line-height: 1.55; color: var(--ink); }
+.stepblock ol { margin: 0; padding-left: 18px; }
+.stepblock ol li { font-size: 13px; line-height: 1.6; color: var(--ink); margin-bottom: 4px; }
+.sheet-done { display: block; width: 100%; margin-top: 8px; padding: 10px; font-size: 14px; }
+.sheet-jump { display: inline-block; margin-top: 6px; background: var(--shopee-orange); color: #fff; border-color: var(--shopee-orange); }
+.sheet-jump:hover { background: var(--shopee-red); }
 
 .alarmdays { display: flex; gap: 6px; margin-top: 10px; }
 .alarmdays .day { width: 30px; height: 30px; border-radius: 50%; border: 1.5px solid var(--line); background: #fff; color: var(--muted); font-family: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
