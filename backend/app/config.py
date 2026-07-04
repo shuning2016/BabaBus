@@ -17,6 +17,8 @@ class Settings(BaseSettings):
     vapid_subject: str = "mailto:shuning2016@gmail.com"
     # shared secret guarding the cron-triggered /api/push/tick endpoint
     push_secret: str = ""
+    # OAuth Web client id for "Sign in with Google" (id-token audience check)
+    google_client_id: str = ""
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     @property

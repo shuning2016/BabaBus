@@ -2,14 +2,20 @@
 // Native builds (Capacitor iOS/Android) have no same-origin backend, so they
 // set VITE_API_BASE to the hosted API at build time.
 import { deviceId } from './device';
+import { sessionToken } from './session';
 
 const BASE =
   import.meta.env.VITE_API_BASE ?? (import.meta.env.DEV ? 'http://localhost:8000' : '');
 
 async function j(path, opts = {}) {
+  const token = sessionToken();
   const res = await fetch(`${BASE}${path}`, {
     ...opts,
-    headers: { 'X-Device-Id': deviceId(), ...(opts.headers || {}) },
+    headers: {
+      'X-Device-Id': deviceId(),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(opts.headers || {}),
+    },
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
@@ -45,6 +51,9 @@ export const addSchedule = (body) =>
 export const updateSchedule = (id, body) =>
   j(`/api/schedules/${id}`, { ...post(body), method: 'PATCH' });
 export const deleteSchedule = (id) => j(`/api/schedules/${id}`, { method: 'DELETE' });
+export const googleSignIn = (credential) => j('/api/auth/google', post({ credential }));
+export const getMe = () => j('/api/auth/me');
+export const signOut = () => j('/api/auth/logout', { method: 'POST' });
 export const getVapidKey = () => j('/api/push/vapid');
 export const subscribePush = (sub) => j('/api/push/subscribe', post(sub));
 export const unsubscribePush = (sub) => j('/api/push/unsubscribe', post(sub));
