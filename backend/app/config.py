@@ -18,8 +18,8 @@ class Settings(BaseSettings):
     # shared secret guarding the cron-triggered /api/push/tick endpoint
     push_secret: str = ""
     # OAuth Web client id for "Sign in with Google" (id-token audience check).
-    # Public value (safe to commit); an env var of the same name overrides it.
-    google_client_id: str = "339749162186-dcimakscdhsigaov376e76fdgoq501lk.apps.googleusercontent.com"
+    # Provided via the GOOGLE_CLIENT_ID env var (set in Vercel).
+    google_client_id: str = ""
     # "Sign in with Apple" Services ID (the web client_id / id-token audience).
     apple_client_id: str = ""
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")

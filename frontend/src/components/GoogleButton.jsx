@@ -1,10 +1,7 @@
 import { useEffect, useRef } from 'react';
 
-// Web OAuth client id. Public value (locked to our origin), so it's baked in as
-// the default; a VITE_GOOGLE_CLIENT_ID build env var overrides it if set.
-const CLIENT_ID =
-  import.meta.env.VITE_GOOGLE_CLIENT_ID ||
-  '339749162186-dcimakscdhsigaov376e76fdgoq501lk.apps.googleusercontent.com';
+// Web OAuth client id, injected at build time from Vercel's VITE_GOOGLE_CLIENT_ID.
+const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
 let gisPromise = null;
 function loadGis() {
