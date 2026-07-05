@@ -100,6 +100,26 @@ export default function App() {
     refreshSchedules();
   }, []);
 
+  // Reopened after a long background (e.g. hours later): re-acquire location and
+  // refresh data so the map isn't stuck on the old spot and timings aren't stale.
+  const resumeRef = useRef(() => {});
+  resumeRef.current = () => {
+    refreshFavs();
+    refreshSchedules();
+    if (!mapTarget) loadNearby(); // re-locate + refresh nearby (map re-centers)
+  };
+  useEffect(() => {
+    let hiddenAt = null;
+    const onVis = () => {
+      if (document.visibilityState === 'hidden') { hiddenAt = Date.now(); return; }
+      const away = hiddenAt ? Date.now() - hiddenAt : 0;
+      hiddenAt = null;
+      if (away >= 20000) resumeRef.current(); // ignore brief app-switches
+    };
+    document.addEventListener('visibilitychange', onVis);
+    return () => document.removeEventListener('visibilitychange', onVis);
+  }, []);
+
   const loadNearby = () => {
     const loadAt = (lat, lon) =>
       getNearby(lat, lon).then((d) => {
