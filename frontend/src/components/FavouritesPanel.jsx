@@ -8,7 +8,7 @@ import FavouriteCard from './FavouriteCard';
  */
 export default function FavouritesPanel({
   favourites, onShowBus, onShowRoute, onCreateStationAlarm,
-  watchedBuses, onToggleWatchBus, onQuickAlarm, onRename, onDelete,
+  watchedBuses, onToggleWatchBus, onQuickAlarm, onRename, onDelete, onRemoveStop,
 }) {
   const stopFavs = favourites.filter((f) => !f.service_no);
   const busFavs = favourites.filter((f) => f.service_no);
@@ -37,7 +37,7 @@ export default function FavouritesPanel({
       onShowBus={onShowBus} onShowRoute={onShowRoute}
       onCreateStationAlarm={onCreateStationAlarm} onQuickAlarm={onQuickAlarm}
       watchedBuses={watchedBuses} onToggleWatchBus={onToggleWatchBus}
-      onRename={onRename} onDelete={onDelete} />
+      onRename={onRename} onDelete={onDelete} onRemoveStop={onRemoveStop} />
   );
 
   return (

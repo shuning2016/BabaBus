@@ -275,6 +275,12 @@ export default function App() {
     if (name) renameFavourite(id, name).then(refreshFavs);
   };
 
+  // Remove an implicit "My Buses" stop by un-watching every bus watched there.
+  const removeWatchedStop = (stopId) => {
+    const ids = favourites.filter((f) => f.stop_id === stopId && f.service_no).map((f) => f.id);
+    Promise.all(ids.map((id) => deleteFavourite(id))).then(refreshFavs);
+  };
+
   return (
     <div className={`app tab-${tab}`}>
       {showNotifHelp && <NotificationHelp onClose={() => setShowNotifHelp(false)} />}
@@ -298,6 +304,7 @@ export default function App() {
             watchedBuses={watchedBuses} onToggleWatchBus={onToggleWatchBus}
             onCreateStationAlarm={onCreateStationAlarm} onQuickAlarm={quickAlarm}
             onRename={renameFav} onDelete={(id) => deleteFavourite(id).then(refreshFavs)}
+            onRemoveStop={removeWatchedStop}
           />
         </section>
 

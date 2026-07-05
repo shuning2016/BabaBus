@@ -13,7 +13,7 @@ const POLL_MS = 15000;
  */
 export default function FavouriteCard({
   fav, onShowBus, onShowRoute, onCreateStationAlarm,
-  watchedBuses, onToggleWatchBus, onQuickAlarm, onRename, onDelete,
+  watchedBuses, onToggleWatchBus, onQuickAlarm, onRename, onDelete, onRemoveStop,
 }) {
   const [data, setData] = useState(null);
   const [error, setError] = useState(false);
@@ -52,6 +52,10 @@ export default function FavouriteCard({
         )}
         {!implicit && <button className="plain" title="Rename" onClick={() => onRename(fav.id)}>✏️</button>}
         {!implicit && <button className="plain" title="Remove" onClick={() => onDelete(fav.id)}>🗑</button>}
+        {implicit && onRemoveStop && (
+          <button className="plain" title="Remove — stop watching all buses here"
+            onClick={() => onRemoveStop(fav.stop_id)}>🗑</button>
+        )}
       </div>
       {error && <p className="stale">Couldn't load timings</p>}
       {!data && !error && <p className="muted">Loading timings…</p>}
