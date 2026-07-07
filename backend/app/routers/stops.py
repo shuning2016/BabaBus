@@ -6,7 +6,10 @@ from ..deps import get_cache, get_datasource
 
 router = APIRouter(prefix="/api/stops")
 
-ARRIVALS_TTL_SECONDS = 15
+# Short enough that a map poll shortly after opening gets a genuinely fresh
+# LTA snapshot (bus positions start moving sooner); still shields LTA from
+# every card/map poller hitting the same stop at once.
+ARRIVALS_TTL_SECONDS = 8
 
 
 @router.get("/nearby")

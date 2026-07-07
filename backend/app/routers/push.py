@@ -82,8 +82,8 @@ def _catch_hint(loc: dict | None, stop, rows, now_epoch: int) -> str | None:
             if eta >= walk_min + CATCH_BUFFER_MIN and (best is None or eta < best[0]):
                 best = (eta, a.service_no)
     if best:
-        return f"🚶{walk_min} min → 🏃 catch {best[1]} in {best[0]} min"
-    return f"🚶{walk_min} min walk — shown buses leave too soon"
+        return f"🏃 LEAVE NOW — catch {best[1]} in {best[0]} min (🚶 {walk_min} min)"
+    return f"🚶 {walk_min} min walk — shown buses leave too soon"
 
 
 def _is_apple(endpoint: str) -> bool:
@@ -164,7 +164,7 @@ def tick(secret: str = Query("")):
                     stops_by_id = {st.id: st for st in ds.get_stops()}
                 hint = _catch_hint(loc_by_owner[owner], stops_by_id.get(s["stop_id"]), rows, now_epoch)
                 if hint:
-                    body = f"{body} · {hint}"
+                    body = f"{hint}\n{body}"  # catchability first — it's the actionable line
         else:
             body = "no live timing right now"
 

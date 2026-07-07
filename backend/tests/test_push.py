@@ -233,7 +233,10 @@ def test_tick_adds_catch_hint_with_fresh_location(monkeypatch):
 
     client.post("/api/push/tick", params={"secret": SECRET})
     assert len(sent) == 1
-    assert "🚶1 min" in sent[0]["body"]  # at the stop → 1-min walk, hint present
+    body = sent[0]["body"]
+    assert "🚶 1 min" in body  # at the stop → 1-min walk, hint present
+    # The hint leads on its own line; the raw timings follow.
+    assert "\n" in body and body.index("🚶") < body.index("7:")
 
 
 def test_tick_no_hint_without_or_with_stale_location(monkeypatch):
@@ -265,11 +268,11 @@ def test_catch_hint_picks_earliest_catchable_bus():
     loc = {"lat": 1.3018, "lon": 103.8541, "updated": 1000}
     rows = [NS(service_no="7", etas=[3, 12, 25]), NS(service_no="131", etas=[9, 20])]
     hint = _catch_hint(loc, stop, rows, now_epoch=1060)
-    assert hint == "🚶7 min → 🏃 catch 131 in 9 min"  # 9 beats 12; 3 is uncatchable
+    assert hint == "🏃 LEAVE NOW — catch 131 in 9 min (🚶 7 min)"  # 9 beats 12; 3 is uncatchable
 
     # Nothing catchable → honest warning instead of a fake catch.
     hint = _catch_hint(loc, stop, [NS(service_no="7", etas=[2, 5])], now_epoch=1060)
-    assert hint == "🚶7 min walk — shown buses leave too soon"
+    assert hint == "🚶 7 min walk — shown buses leave too soon"
 
 
 def test_apple_held_back_until_live_timing(monkeypatch):

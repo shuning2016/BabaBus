@@ -136,16 +136,25 @@ export default function App() {
         setHeading('Nearby stops');
         return null;
       });
-    if (!navigator.geolocation) return loadAt(DEFAULT_CENTER.lat, DEFAULT_CENTER.lon);
+    // Paint instantly from the last remembered position (cold starts otherwise
+    // stare at nothing for the seconds a fresh GPS lock takes), then re-center
+    // once the real fix lands — but only if the user actually moved.
+    let cached = null;
+    try { cached = JSON.parse(localStorage.getItem('bababus-last-pos')); } catch { /* ignore */ }
+    if (cached?.lat) loadAt(cached.lat, cached.lon);
+    if (!navigator.geolocation) return cached?.lat ? null : loadAt(DEFAULT_CENTER.lat, DEFAULT_CENTER.lon);
     navigator.geolocation.getCurrentPosition(
       (pos) => {
+        const lat = pos.coords.latitude;
+        const lon = pos.coords.longitude;
+        try { localStorage.setItem('bababus-last-pos', JSON.stringify({ lat, lon })); } catch { /* ignore */ }
         // share the fix so alarm pushes can say which bus is catchable from here
-        reportLocation(pos.coords.latitude, pos.coords.longitude).catch(() => {});
-        loadAt(pos.coords.latitude, pos.coords.longitude);
+        reportLocation(lat, lon).catch(() => {});
+        if (!cached?.lat || approxMetres([lat, lon], [cached.lat, cached.lon]) > 150) loadAt(lat, lon);
       },
-      () => loadAt(DEFAULT_CENTER.lat, DEFAULT_CENTER.lon),
-      // a slightly cached fix beats waiting: don't stall the map for a fresh lock
-      { maximumAge: 20000, timeout: 8000 }
+      () => { if (!cached?.lat) loadAt(DEFAULT_CENTER.lat, DEFAULT_CENTER.lon); },
+      // a slightly stale fix beats waiting: don't stall the map for a fresh lock
+      { maximumAge: 60000, timeout: 8000 }
     );
     return null;
   };
@@ -225,8 +234,12 @@ export default function App() {
         setAreaBuses(withIds);
       });
     load();
+    // Markers only start moving on the SECOND sample — pull it in early so
+    // buses don't sit frozen for a full poll interval after first paint.
+    // 8.5 s clears the server's 8 s arrivals cache, so this sample is fresh.
+    const kick = setTimeout(load, 8500);
     const timer = setInterval(load, 15000);
-    return () => { alive = false; clearInterval(timer); };
+    return () => { alive = false; clearTimeout(kick); clearInterval(timer); };
   }, [mapTarget, stops, resumeCount]);
 
   const onMapMove = (lat, lon) => {

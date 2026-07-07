@@ -1,5 +1,5 @@
-@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&display=swap');
-
+/* Roboto is loaded from index.html (<link> + preconnect) — a CSS @import here
+   would serialize behind the app bundle and block first paint on cold starts. */
 :root {
   --shopee-orange: #EE4D2D;
   --shopee-red: #F05025;

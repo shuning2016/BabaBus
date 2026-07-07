@@ -7,6 +7,13 @@
     <meta name="theme-color" content="#EE4D2D" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="apple-touch-icon" href="/icon-192.png" />
+    <!-- Non-blocking font load: media="print" keeps it off the render path, the
+         onload swap applies it once fetched. Text shows instantly in a fallback
+         font; a slow/unreachable font CDN can no longer delay first paint. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" media="print" onload="this.media='all'"
+      href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&display=swap" />
     <title>BabaBus</title>
   </head>
   <body>
