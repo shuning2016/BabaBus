@@ -264,14 +264,16 @@ def test_catch_hint_picks_earliest_catchable_bus():
     from app.routers.push import _catch_hint
 
     stop = NS(lat=1.2982, lon=103.8541)
+    now = datetime(2026, 7, 4, 8, 30, tzinfo=SGT)
     # ~400 m away → walk ≈ 400*1.25/1.33/60 ≈ 6.3 → 7 min; buffer 1 → need eta ≥ 8
-    loc = {"lat": 1.3018, "lon": 103.8541, "updated": 1000}
+    loc = {"lat": 1.3018, "lon": 103.8541, "updated": int(now.timestamp()) - 60}
     rows = [NS(service_no="7", etas=[3, 12, 25]), NS(service_no="131", etas=[9, 20])]
-    hint = _catch_hint(loc, stop, rows, now_epoch=1060)
-    assert hint == "🏃 LEAVE NOW — catch 131 in 9 min (🚶 7 min)"  # 9 beats 12; 3 is uncatchable
+    hint = _catch_hint(loc, stop, rows, now)
+    # 9-min bus beats the 12-min one; the 3-min bus is uncatchable → 08:30 + 9
+    assert hint == "🏃 LEAVE NOW — catch 131 at 08:39 (🚶 7 min)"
 
     # Nothing catchable → honest warning instead of a fake catch.
-    hint = _catch_hint(loc, stop, [NS(service_no="7", etas=[2, 5])], now_epoch=1060)
+    hint = _catch_hint(loc, stop, [NS(service_no="7", etas=[2, 5])], now)
     assert hint == "🚶 7 min walk — shown buses leave too soon"
 
 

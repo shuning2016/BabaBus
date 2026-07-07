@@ -67,12 +67,12 @@ def _broadcast(payload: dict, subs: list | None = None) -> int:
     return sent
 
 
-def _catch_hint(loc: dict | None, stop, rows, now_epoch: int) -> str | None:
+def _catch_hint(loc: dict | None, stop, rows, now: datetime) -> str | None:
     """From the user's last known location, how long is the walk to the stop
     and which shown bus can they still catch if they leave right now?"""
     if not loc or not stop or not rows:
         return None
-    if now_epoch - loc["updated"] > LOCATION_FRESH_S:
+    if int(now.timestamp()) - loc["updated"] > LOCATION_FRESH_S:
         return None
     walk_m = haversine_m(loc["lat"], loc["lon"], stop.lat, stop.lon) * WALK_DETOUR
     walk_min = max(1, math.ceil(walk_m / WALK_MPS / 60))
@@ -82,7 +82,9 @@ def _catch_hint(loc: dict | None, stop, rows, now_epoch: int) -> str | None:
             if eta >= walk_min + CATCH_BUFFER_MIN and (best is None or eta < best[0]):
                 best = (eta, a.service_no)
     if best:
-        return f"🏃 LEAVE NOW — catch {best[1]} in {best[0]} min (🚶 {walk_min} min)"
+        # A clock time is easier to act on than a countdown that keeps shifting.
+        at = (now + timedelta(minutes=best[0])).strftime("%H:%M")
+        return f"🏃 LEAVE NOW — catch {best[1]} at {at} (🚶 {walk_min} min)"
     return f"🚶 {walk_min} min walk — shown buses leave too soon"
 
 
@@ -162,7 +164,7 @@ def tick(secret: str = Query("")):
             if loc_by_owner[owner]:
                 if stops_by_id is None:
                     stops_by_id = {st.id: st for st in ds.get_stops()}
-                hint = _catch_hint(loc_by_owner[owner], stops_by_id.get(s["stop_id"]), rows, now_epoch)
+                hint = _catch_hint(loc_by_owner[owner], stops_by_id.get(s["stop_id"]), rows, now)
                 if hint:
                     body = f"{hint}\n{body}"  # catchability first — it's the actionable line
         else:
