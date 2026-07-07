@@ -54,6 +54,8 @@ export const deleteSchedule = (id) => j(`/api/schedules/${id}`, { method: 'DELET
 export const googleSignIn = (credential) => j('/api/auth/google', post({ credential }));
 export const getMe = () => j('/api/auth/me');
 export const signOut = () => j('/api/auth/logout', { method: 'POST' });
+// Lets the cron alarm say which bus is catchable from where the user is now.
+export const reportLocation = (lat, lon) => j('/api/location', post({ lat, lon }));
 export const getVapidKey = () => j('/api/push/vapid');
 export const subscribePush = (sub) => j('/api/push/subscribe', post(sub));
 export const unsubscribePush = (sub) => j('/api/push/unsubscribe', post(sub));

@@ -69,6 +69,12 @@ export default function StopCard({
         const watchingRows = data.services.filter(isWatching);
         // No watched buses here → show everything so the stop isn't empty
         const visible = showAll || watchingRows.length === 0 ? data.services : watchingRows;
+        // Toggling while the full list is visible keeps it expanded, so picking
+        // the first bus doesn't fold the card while the user adds more.
+        const toggle = (no) => {
+          if (showAll || watchingRows.length === 0) setShowAll(true);
+          onToggleWatchBus(stop.id, data.stop_name, no);
+        };
         return (
           <>
             {data.stale && <p className="stale">⚠ showing last known timings</p>}
@@ -76,7 +82,7 @@ export default function StopCard({
               <ArrivalRow key={svc.service_no} svc={svc} stopId={stop.id} stopName={data.stop_name}
                 onShowBus={onShowBus} onShowRoute={onShowRoute}
                 watching={isWatching(svc)}
-                onToggleWatch={(no) => onToggleWatchBus(stop.id, data.stop_name, no)}
+                onToggleWatch={toggle}
                 onQuickAlarm={onQuickAlarm} />
             ))}
             {watchingRows.length > 0 && watchingRows.length < data.services.length && (

@@ -207,6 +207,71 @@ def test_tick_apple_every_5min_android_every_tick(monkeypatch):
     assert any("apple" in e for e in sent_to)
 
 
+def test_location_roundtrip_and_validation():
+    assert client.post("/api/location", json={"lat": 1.2982, "lon": 103.8541}).json() == {"ok": True}
+    loc = db.get_location("test-device")
+    assert loc["lat"] == 1.2982 and loc["lon"] == 103.8541 and loc["updated"] > 0
+    assert client.post("/api/location", json={"lat": 91, "lon": 0}).status_code == 422
+
+
+def test_location_migrates_on_sign_in():
+    db.set_location("device-a", 1.3, 103.8, 1000)
+    db.migrate_owner("device-a", "acct-1")
+    assert db.get_location("acct-1")["lat"] == 1.3
+    assert db.get_location("device-a") is None
+
+
+def test_tick_adds_catch_hint_with_fresh_location(monkeypatch):
+    """When the app reported a recent location, the alarm push says how long
+    the walk to the stop is and which shown bus is still catchable."""
+    sent = []
+    monkeypatch.setattr(push_router, "send_web_push", lambda sub, payload: sent.append(payload))
+    client.post("/api/push/subscribe", json={"endpoint": "e", "p256dh": "k", "auth": "a"})
+    client.post("/api/schedules", json={"stop_id": "01029", "services": ["7"], "label": "x", **ALL_DAY})
+    # Standing right at the stop (01029 = Opp Natl Lib in the demo dataset)
+    client.post("/api/location", json={"lat": 1.2982, "lon": 103.8541})
+
+    client.post("/api/push/tick", params={"secret": SECRET})
+    assert len(sent) == 1
+    assert "🚶1 min" in sent[0]["body"]  # at the stop → 1-min walk, hint present
+
+
+def test_tick_no_hint_without_or_with_stale_location(monkeypatch):
+    sent = []
+    monkeypatch.setattr(push_router, "send_web_push", lambda sub, payload: sent.append(payload))
+    client.post("/api/push/subscribe", json={"endpoint": "e", "p256dh": "k", "auth": "a"})
+    created = client.post("/api/schedules", json={"stop_id": "01029", "services": ["7"], "label": "x", **ALL_DAY}).json()
+
+    # No reported location at all → plain timing body.
+    client.post("/api/push/tick", params={"secret": SECRET})
+    assert len(sent) == 1 and "🚶" not in sent[0]["body"]
+
+    # An hour-old fix is stale → still no hint.
+    sent.clear()
+    now = int(datetime.now(SGT).timestamp())
+    db.set_location("test-device", 1.2982, 103.8541, now - 3600)
+    db.set_last_push(created["id"], now - 600)
+    client.post("/api/push/tick", params={"secret": SECRET})
+    assert len(sent) == 1 and "🚶" not in sent[0]["body"]
+
+
+def test_catch_hint_picks_earliest_catchable_bus():
+    from types import SimpleNamespace as NS
+
+    from app.routers.push import _catch_hint
+
+    stop = NS(lat=1.2982, lon=103.8541)
+    # ~400 m away → walk ≈ 400*1.25/1.33/60 ≈ 6.3 → 7 min; buffer 1 → need eta ≥ 8
+    loc = {"lat": 1.3018, "lon": 103.8541, "updated": 1000}
+    rows = [NS(service_no="7", etas=[3, 12, 25]), NS(service_no="131", etas=[9, 20])]
+    hint = _catch_hint(loc, stop, rows, now_epoch=1060)
+    assert hint == "🚶7 min → 🏃 catch 131 in 9 min"  # 9 beats 12; 3 is uncatchable
+
+    # Nothing catchable → honest warning instead of a fake catch.
+    hint = _catch_hint(loc, stop, [NS(service_no="7", etas=[2, 5])], now_epoch=1060)
+    assert hint == "🚶7 min walk — shown buses leave too soon"
+
+
 def test_apple_held_back_until_live_timing(monkeypatch):
     """Apple is alerted only once there's real timing to show — a 'no live
     timing' tick shouldn't spend an iOS banner on nothing."""

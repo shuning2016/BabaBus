@@ -17,6 +17,15 @@ html, body, #root { height: 100%; overflow: hidden; overscroll-behavior: none; }
 body { margin: 0; font-family: 'Roboto', sans-serif; background: var(--bg); color: var(--ink); -webkit-font-smoothing: antialiased; }
 h1, h2, h3, h4 { margin: 0; }
 
+/* Snappy taps: manipulation removes the mobile double-tap-zoom delay, the
+   transparent highlight kills the grey flash, and :active gives instant
+   press-down feedback so buttons never feel dead while a request runs. */
+button, input, select, a { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+.pill:active, .chip:active, .svc-chip:active, button.plain:active, .showall:active,
+.brandbtn:active, .installbtn:active, .linkbtn:active, .alarmdays .day:active { transform: scale(.94); opacity: .85; }
+.tabbar button:active .ti { transform: scale(.88); }
+.tabbar button .ti { transition: transform .1s; }
+
 /* ---------- Shell: header · tabs · content ---------- */
 .app { display: flex; flex-direction: column; height: 100vh; height: 100dvh; overflow: hidden; }
 

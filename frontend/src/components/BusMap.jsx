@@ -2,6 +2,7 @@ import L from 'leaflet';
 import { CircleMarker, MapContainer, Marker, Polyline, Popup, TileLayer, ZoomControl, useMap, useMapEvents } from 'react-leaflet';
 import { useEffect, useRef, useState } from 'react';
 import { getArrivals } from '../api';
+import { approxMetres } from '../geo';
 
 const ORANGE = '#EE4D2D';
 const ANIM_MS = 15000; // buses glide toward their latest position over one poll cycle
@@ -115,9 +116,13 @@ function AnimatedBuses({ buses, onQuickAlarmBus }) {
       const existing = store.current.get(b.id);
       if (existing) {
         const cur = existing.marker.getLatLng();
-        existing.from = { lat: cur.lat, lon: cur.lng };
+        // A big jump means the data is from a reopen after a long background —
+        // snap to the real position instead of gliding there for 15 s.
+        const jumped = approxMetres([b.lat, b.lon], [cur.lat, cur.lng]) > 500;
+        existing.from = jumped ? { lat: b.lat, lon: b.lon } : { lat: cur.lat, lon: cur.lng };
         existing.to = { lat: b.lat, lon: b.lon };
         existing.start = performance.now();
+        if (jumped) existing.marker.setLatLng([b.lat, b.lon]);
         if (!existing.marker.isPopupOpen()) {
           existing.marker.setPopupContent(busPopupContent(b, onQuickAlarmBus));
         }
@@ -161,6 +166,12 @@ function StopArrivalsPopup({ stop, onAlarmStop, watchedBuses, onToggleWatchBus }
   const isWatching = (s) => watchedBuses?.has(`${stop.id}:${s.service_no}`);
   const watching = (services || []).filter(isWatching);
   const visible = services ? (showAll || watching.length === 0 ? services : watching) : [];
+  // Toggling while the full list is visible keeps it expanded, so picking the
+  // first bus doesn't fold the popup while the user adds more.
+  const toggle = (no) => {
+    if (showAll || watching.length === 0) setShowAll(true);
+    onToggleWatchBus && onToggleWatchBus(stop.id, stop.name, no);
+  };
 
   return (
     <div style={{ minWidth: 190 }}>
@@ -173,7 +184,7 @@ function StopArrivalsPopup({ stop, onAlarmStop, watchedBuses, onToggleWatchBus }
         <div key={s.service_no} style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 12, marginTop: 5 }}>
           <button
             title={isWatching(s) ? 'Watching — click to remove' : 'Click to add to my watching buses'}
-            onClick={() => onToggleWatchBus && onToggleWatchBus(stop.id, stop.name, s.service_no)}
+            onClick={() => toggle(s.service_no)}
             style={{
               background: isWatching(s) ? ORANGE : '#fff',
               color: isWatching(s) ? '#fff' : '#8794AD',

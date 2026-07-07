@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { addFavourite, addSchedule, deleteFavourite, getArrivals, getFavourites, getHealth, getMe, getNearby, getRoute, getSchedules, renameFavourite, signOut } from './api';
+import { addFavourite, addSchedule, deleteFavourite, getArrivals, getFavourites, getHealth, getMe, getNearby, getRoute, getSchedules, renameFavourite, reportLocation, signOut } from './api';
 import SearchBar from './components/SearchBar';
 import StopCard from './components/StopCard';
 import BusMap from './components/BusMap';
@@ -102,10 +102,14 @@ export default function App() {
 
   // Reopened after a long background (e.g. hours later): re-acquire location and
   // refresh data so the map isn't stuck on the old spot and timings aren't stale.
+  // resumeCount kicks the bus-position effects immediately instead of waiting
+  // out their 15 s poll interval.
+  const [resumeCount, setResumeCount] = useState(0);
   const resumeRef = useRef(() => {});
   resumeRef.current = () => {
     refreshFavs();
     refreshSchedules();
+    setResumeCount((c) => c + 1);
     if (!mapTarget) loadNearby(); // re-locate + refresh nearby (map re-centers)
   };
   useEffect(() => {
@@ -134,8 +138,14 @@ export default function App() {
       });
     if (!navigator.geolocation) return loadAt(DEFAULT_CENTER.lat, DEFAULT_CENTER.lon);
     navigator.geolocation.getCurrentPosition(
-      (pos) => loadAt(pos.coords.latitude, pos.coords.longitude),
-      () => loadAt(DEFAULT_CENTER.lat, DEFAULT_CENTER.lon)
+      (pos) => {
+        // share the fix so alarm pushes can say which bus is catchable from here
+        reportLocation(pos.coords.latitude, pos.coords.longitude).catch(() => {});
+        loadAt(pos.coords.latitude, pos.coords.longitude);
+      },
+      () => loadAt(DEFAULT_CENTER.lat, DEFAULT_CENTER.lon),
+      // a slightly cached fix beats waiting: don't stall the map for a fresh lock
+      { maximumAge: 20000, timeout: 8000 }
     );
     return null;
   };
@@ -148,7 +158,7 @@ export default function App() {
 
   useEffect(() => {
     if (!mapTarget || mapTarget.type !== 'bus') return undefined;
-    const timer = setInterval(() => {
+    const load = () => {
       getArrivals(mapTarget.stopId)
         .then((d) => {
           const svc = d.services.find((s) => s.service_no === mapTarget.serviceNo);
@@ -161,9 +171,11 @@ export default function App() {
           }
         })
         .catch(() => {});
-    }, 15000);
+    };
+    if (resumeCount > 0) load(); // reopened — refresh the position right away
+    const timer = setInterval(load, 15000);
     return () => clearInterval(timer);
-  }, [mapTarget?.type, mapTarget?.stopId, mapTarget?.serviceNo]);
+  }, [mapTarget?.type, mapTarget?.stopId, mapTarget?.serviceNo, resumeCount]);
 
   const onPickPoint = (lat, lon) => {
     setExploreCenter([lat, lon]);
@@ -215,7 +227,7 @@ export default function App() {
     load();
     const timer = setInterval(load, 15000);
     return () => { alive = false; clearInterval(timer); };
-  }, [mapTarget, stops]);
+  }, [mapTarget, stops, resumeCount]);
 
   const onMapMove = (lat, lon) => {
     if (lastLoad.current && approxMetres([lat, lon], lastLoad.current) < 200) return;
@@ -239,13 +251,22 @@ export default function App() {
   const watchedBuses = new Set(busFavs.map((f) => watchKey(f.stop_id, f.service_no)));
   const watchedIds = new Map(busFavs.map((f) => [watchKey(f.stop_id, f.service_no), f.id]));
 
+  // Optimistic: flip the chip instantly, sync with the server behind it (the
+  // round-trip made taps feel laggy). refreshFavs reconciles either way.
   const onToggleWatchBus = (stopId, stopName, serviceNo) => {
     const key = watchKey(stopId, serviceNo);
-    if (watchedBuses.has(key)) return deleteFavourite(watchedIds.get(key)).then(refreshFavs);
-    return addFavourite({
+    if (watchedBuses.has(key)) {
+      const id = watchedIds.get(key);
+      if (typeof id === 'string') return Promise.resolve(); // still saving — ignore the re-tap
+      setFavourites((cur) => cur.filter((f) => f.id !== id));
+      return deleteFavourite(id).then(refreshFavs, refreshFavs);
+    }
+    const body = {
       stop_id: stopId, custom_name: `${serviceNo} @ ${stopName}`,
       group_name: 'My Buses', service_no: serviceNo,
-    }).then(refreshFavs);
+    };
+    setFavourites((cur) => [...cur, { id: `tmp-${key}`, ...body }]);
+    return addFavourite(body).then(refreshFavs, refreshFavs);
   };
 
   const requestNotif = () => {
@@ -296,9 +317,12 @@ export default function App() {
   };
 
   // Remove an implicit "My Buses" stop by un-watching every bus watched there.
+  // Skip optimistic tmp- entries that haven't been saved server-side yet.
   const removeWatchedStop = (stopId) => {
-    const ids = favourites.filter((f) => f.stop_id === stopId && f.service_no).map((f) => f.id);
-    Promise.all(ids.map((id) => deleteFavourite(id))).then(refreshFavs);
+    const ids = favourites
+      .filter((f) => f.stop_id === stopId && f.service_no && typeof f.id === 'number')
+      .map((f) => f.id);
+    Promise.all(ids.map((id) => deleteFavourite(id))).then(refreshFavs, refreshFavs);
   };
 
   return (

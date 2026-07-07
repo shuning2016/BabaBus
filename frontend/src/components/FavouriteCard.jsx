@@ -38,6 +38,12 @@ export default function FavouriteCard({
   const services = showAll || watching.length === 0 ? all : watching;
   const hiddenCount = watching.length > 0 ? all.length - watching.length : 0;
   const title = fav.custom_name || (data ? data.stop_name : fav.stop_id);
+  // Toggling while the full list is visible keeps it expanded, so picking the
+  // first bus doesn't fold the card while the user adds more.
+  const toggleWatch = (no) => {
+    if (showAll || watching.length === 0) setShowAll(true);
+    onToggleWatchBus(fav.stop_id, data.stop_name, no);
+  };
 
   return (
     <div className="card">
@@ -74,7 +80,7 @@ export default function FavouriteCard({
         <ArrivalRow key={svc.service_no} svc={svc} stopId={fav.stop_id} stopName={data.stop_name}
           onShowBus={onShowBus} onShowRoute={onShowRoute} onQuickAlarm={onQuickAlarm}
           watching={isWatching(svc)}
-          onToggleWatch={(no) => onToggleWatchBus(fav.stop_id, data.stop_name, no)} />
+          onToggleWatch={toggleWatch} />
       ))}
       {hiddenCount > 0 && (
         <button className="showall" onClick={() => setShowAll(!showAll)}>

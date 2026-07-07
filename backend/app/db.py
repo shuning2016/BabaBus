@@ -168,6 +168,17 @@ def init_db(path: Optional[str] = None) -> None:
         )""",
         path=path,
     )
+    # Last reported device location — lets the cron tick say which bus the user
+    # can still catch if they walk to the stop now. One row per owner.
+    _run(
+        """CREATE TABLE IF NOT EXISTS locations (
+            owner TEXT PRIMARY KEY,
+            lat REAL NOT NULL,
+            lon REAL NOT NULL,
+            updated INTEGER NOT NULL
+        )""",
+        path=path,
+    )
 
 
 def list_favourites(owner: str, path: Optional[str] = None) -> list[dict]:
@@ -284,6 +295,19 @@ def delete_schedule(schedule_id: int, owner: str, path: Optional[str] = None) ->
     )["rowcount"] > 0
 
 
+def set_location(owner: str, lat: float, lon: float, epoch: int, path: Optional[str] = None) -> None:
+    _run(
+        "INSERT OR REPLACE INTO locations (owner, lat, lon, updated) VALUES (?, ?, ?, ?)",
+        (owner, lat, lon, epoch),
+        path=path,
+    )
+
+
+def get_location(owner: str, path: Optional[str] = None) -> Optional[dict]:
+    rows = _run("SELECT * FROM locations WHERE owner = ?", (owner,), path=path)["rows"]
+    return rows[0] if rows else None
+
+
 # --- Accounts & sessions -------------------------------------------------
 
 def get_account(account_id: str, path: Optional[str] = None) -> Optional[dict]:
@@ -344,3 +368,11 @@ def migrate_owner(from_owner: str, to_owner: str, path: Optional[str] = None) ->
     """Reassign a device's favourites/alarms/subscriptions to an account on sign-in."""
     for table in ("favourites", "schedules", "push_subscriptions"):
         _run(f"UPDATE {table} SET owner = ? WHERE owner = ?", (to_owner, from_owner), path=path)
+    # locations has owner as its primary key, so move (not update) the row.
+    _run(
+        "INSERT OR REPLACE INTO locations (owner, lat, lon, updated)"
+        " SELECT ?, lat, lon, updated FROM locations WHERE owner = ?",
+        (to_owner, from_owner),
+        path=path,
+    )
+    _run("DELETE FROM locations WHERE owner = ?", (from_owner,), path=path)

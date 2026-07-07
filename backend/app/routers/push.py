@@ -1,3 +1,4 @@
+import math
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
@@ -7,6 +8,7 @@ from pywebpush import WebPushException
 from .. import db
 from ..alarms import active_on, monitored_services, within_window
 from ..config import settings
+from ..datasource.base import haversine_m
 from ..deps import get_datasource, get_owner
 from ..push import send_web_push
 
@@ -14,6 +16,12 @@ SGT = timezone(timedelta(hours=8))
 # iOS shows a banner on every web push (no silent refresh), so re-alert Apple
 # subscriptions no more often than this many minutes; Android refreshes each tick.
 APPLE_MIN_MINUTES = 5
+# Walk-to-the-stop estimate for the "which bus can I catch" hint: adult average
+# speed over straight-line distance × a detour factor (streets aren't straight).
+WALK_MPS = 1.33
+WALK_DETOUR = 1.25
+CATCH_BUFFER_MIN = 1  # need this much slack on top of the walk to board safely
+LOCATION_FRESH_S = 15 * 60  # ignore location fixes older than this
 router = APIRouter(prefix="/api/push")
 
 
@@ -59,6 +67,25 @@ def _broadcast(payload: dict, subs: list | None = None) -> int:
     return sent
 
 
+def _catch_hint(loc: dict | None, stop, rows, now_epoch: int) -> str | None:
+    """From the user's last known location, how long is the walk to the stop
+    and which shown bus can they still catch if they leave right now?"""
+    if not loc or not stop or not rows:
+        return None
+    if now_epoch - loc["updated"] > LOCATION_FRESH_S:
+        return None
+    walk_m = haversine_m(loc["lat"], loc["lon"], stop.lat, stop.lon) * WALK_DETOUR
+    walk_min = max(1, math.ceil(walk_m / WALK_MPS / 60))
+    best = None  # (eta, service_no) of the earliest catchable bus
+    for a in rows:
+        for eta in a.etas:
+            if eta >= walk_min + CATCH_BUFFER_MIN and (best is None or eta < best[0]):
+                best = (eta, a.service_no)
+    if best:
+        return f"🚶{walk_min} min → 🏃 catch {best[1]} in {best[0]} min"
+    return f"🚶{walk_min} min walk — shown buses leave too soon"
+
+
 def _is_apple(endpoint: str) -> bool:
     """Apple/iOS web push must show a banner on every push (no silent update),
     so we re-alert Apple subscriptions on a gentler cadence than Android."""
@@ -98,6 +125,8 @@ def tick(secret: str = Query("")):
         subs_by_owner.setdefault(sub.get("owner"), []).append(sub)
 
     ds = get_datasource()
+    stops_by_id = None  # built lazily — only when a fresh location needs the hint
+    loc_by_owner: dict = {}
     pushed = []
     for s in db.list_schedules():
         if not s["enabled"] or not within_window(now_min, s["start_time"], s["end_time"]):
@@ -126,6 +155,16 @@ def tick(secret: str = Query("")):
                 for a in rows[:3]
             ]
             body = " · ".join(parts)
+            # With a fresh location fix, add walk time and which bus is catchable.
+            owner = s.get("owner")
+            if owner not in loc_by_owner:
+                loc_by_owner[owner] = db.get_location(owner) if owner else None
+            if loc_by_owner[owner]:
+                if stops_by_id is None:
+                    stops_by_id = {st.id: st for st in ds.get_stops()}
+                hint = _catch_hint(loc_by_owner[owner], stops_by_id.get(s["stop_id"]), rows, now_epoch)
+                if hint:
+                    body = f"{body} · {hint}"
         else:
             body = "no live timing right now"
 
