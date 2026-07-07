@@ -18,6 +18,16 @@ import { isWithinWindow, minutesNow, toHHMM } from './alarmClock';
 
 const DEFAULT_CENTER = { lat: 1.2975, lon: 103.854 }; // Bugis — demo dataset area
 
+// Favourites/alarms render instantly from the last known copy while the real
+// fetch runs — a cold serverless backend takes seconds, and the landing page
+// (Favourites) shouldn't sit empty waiting for it.
+const readCache = (key) => {
+  try { return JSON.parse(localStorage.getItem(key)) || []; } catch { return []; }
+};
+const writeCache = (key, value) => {
+  try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* ignore */ }
+};
+
 const TABS = [
   { id: 'fav', icon: '⭐', label: 'Favourite' },
   { id: 'alarms', icon: '⏰', label: 'Alarms' },
@@ -63,9 +73,9 @@ export default function App() {
   const [heading, setHeading] = useState('Nearby stops');
   const [mapTarget, setMapTarget] = useState(null);
   const [exploreCenter, setExploreCenter] = useState(null);
-  const [favourites, setFavourites] = useState([]);
+  const [favourites, setFavourites] = useState(() => readCache('bababus-favs'));
   const [areaBuses, setAreaBuses] = useState([]);
-  const [schedules, setSchedules] = useState([]);
+  const [schedules, setSchedules] = useState(() => readCache('bababus-schedules'));
   const [tab, setTab] = useState('fav'); // default page = Favourite
   const [showNotifHelp, setShowNotifHelp] = useState(false);
   const [account, setAccount] = useState(null);
@@ -75,8 +85,10 @@ export default function App() {
   const lastLoad = useRef(null);
   const prevBuses = useRef([]);
 
-  const refreshFavs = () => getFavourites().then((d) => setFavourites(d.favourites));
-  const refreshSchedules = () => getSchedules().then((d) => setSchedules(d.schedules));
+  const refreshFavs = () =>
+    getFavourites().then((d) => { setFavourites(d.favourites); writeCache('bababus-favs', d.favourites); });
+  const refreshSchedules = () =>
+    getSchedules().then((d) => { setSchedules(d.schedules); writeCache('bababus-schedules', d.schedules); });
 
   const onSignedIn = (token, acct) => {
     setSessionToken(token);      // subsequent requests now scope to the account
@@ -88,6 +100,9 @@ export default function App() {
     signOut().catch(() => {});
     setSessionToken(null);
     setAccount(null);
+    // drop the account's cached data before re-fetching as the anonymous device
+    setFavourites([]); writeCache('bababus-favs', []);
+    setSchedules([]); writeCache('bababus-schedules', []);
     refreshFavs();
     refreshSchedules();
   };
