@@ -308,6 +308,37 @@ def get_location(owner: str, path: Optional[str] = None) -> Optional[dict]:
     return rows[0] if rows else None
 
 
+def usage_stats(now_epoch: int, path: Optional[str] = None) -> dict:
+    """Aggregate, PII-free usage counts for the owner-facing /api/stats."""
+    def one(sql: str, args: tuple = ()) -> int:
+        return _run(sql, args, path=path)["rows"][0]["n"]
+
+    return {
+        # distinct owners across all data = devices + signed-in accounts
+        "users_total": one(
+            "SELECT COUNT(*) AS n FROM ("
+            " SELECT owner FROM favourites WHERE owner IS NOT NULL"
+            " UNION SELECT owner FROM schedules WHERE owner IS NOT NULL"
+            " UNION SELECT owner FROM push_subscriptions WHERE owner IS NOT NULL"
+            " UNION SELECT owner FROM locations WHERE owner IS NOT NULL)"
+        ),
+        "registered_accounts": one("SELECT COUNT(*) AS n FROM accounts"),
+        "devices_with_push": one(
+            "SELECT COUNT(DISTINCT owner) AS n FROM push_subscriptions WHERE owner IS NOT NULL"
+        ),
+        # location is reported on each app open → good "opened recently" proxy
+        "active_last_7d": one(
+            "SELECT COUNT(*) AS n FROM locations WHERE updated > ?", (now_epoch - 7 * 86400,)
+        ),
+        "active_last_24h": one(
+            "SELECT COUNT(*) AS n FROM locations WHERE updated > ?", (now_epoch - 86400,)
+        ),
+        "favourites": one("SELECT COUNT(*) AS n FROM favourites"),
+        "alarms": one("SELECT COUNT(*) AS n FROM schedules"),
+        "alarms_enabled": one("SELECT COUNT(*) AS n FROM schedules WHERE enabled = 1"),
+    }
+
+
 # --- Accounts & sessions -------------------------------------------------
 
 def get_account(account_id: str, path: Optional[str] = None) -> Optional[dict]:

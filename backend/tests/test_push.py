@@ -235,8 +235,10 @@ def test_tick_adds_catch_hint_with_fresh_location(monkeypatch):
     assert len(sent) == 1
     body = sent[0]["body"]
     assert "🚶 1 min" in body  # at the stop → 1-min walk, hint present
-    # The hint leads on its own line; the raw timings follow.
-    assert "\n" in body and body.index("🚶") < body.index("7:")
+    # The hint leads on its own line; the raw timings follow on the next.
+    first, rest = body.split("\n", 1)
+    assert first.startswith(("🏃", "🚶"))
+    assert "7:" in rest  # "7: N min" timing line
 
 
 def test_tick_no_hint_without_or_with_stale_location(monkeypatch):
