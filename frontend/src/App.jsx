@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { addFavourite, addSchedule, deleteFavourite, getArrivals, getFavourites, getHealth, getMe, getNearby, getRoute, getSchedules, renameFavourite, reportLocation, signOut } from './api';
+import { addFavourite, addSchedule, deleteFavourite, getArrivals, getFavourites, getHealth, getMe, getNearby, getRoute, getSchedules, renameFavourite, reportLocation, signOut, updateSchedule } from './api';
 import SearchBar from './components/SearchBar';
 import StopCard from './components/StopCard';
 import BusMap from './components/BusMap';
@@ -323,6 +323,19 @@ export default function App() {
     }).then(refreshSchedules);
   };
 
+  // Alarm status for one bus at a stop — drives the bell's three states:
+  // null = no alarm, running=false = set for later, running=true = live now.
+  const alarmFor = (stopId, serviceNo) => {
+    const matches = schedules.filter((s) =>
+      s.enabled && s.stop_id === stopId && (!s.services.length || s.services.includes(serviceNo)));
+    if (!matches.length) return null;
+    const now = minutesNow();
+    const running = matches.find((s) => isWithinWindow(now, s.start_time, s.end_time));
+    return running ? { schedule: running, running: true } : { schedule: matches[0], running: false };
+  };
+  const cancelAlarm = (schedule) =>
+    updateSchedule(schedule.id, { enabled: false }).then(refreshSchedules);
+
   // 🔔 on a map bus marker: alarm at the station nearest the bus's position
   const quickAlarmAtBus = (bus) =>
     getNearby(bus.lat, bus.lon).then((d) => {
@@ -377,6 +390,7 @@ export default function App() {
             onCreateStationAlarm={onCreateStationAlarm} onQuickAlarm={quickAlarm}
             onRename={renameFav} onDelete={(id) => deleteFavourite(id).then(refreshFavs)}
             onRemoveStop={removeWatchedStop}
+            alarmFor={alarmFor} onCancelAlarm={cancelAlarm} onOpenAlarms={() => setTab('alarms')}
           />
         </section>
 
@@ -411,6 +425,7 @@ export default function App() {
               onFavourite={onFavourite}
               watchedBuses={watchedBuses} onToggleWatchBus={onToggleWatchBus}
               onCreateStationAlarm={onCreateStationAlarm} onQuickAlarm={quickAlarm}
+              alarmFor={alarmFor} onCancelAlarm={cancelAlarm} onOpenAlarms={() => setTab('alarms')}
               autoAlarm={alarmStopId === s.id} onAutoAlarmHandled={() => setAlarmStopId(null)} />
           ))}
         </section>

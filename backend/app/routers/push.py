@@ -52,7 +52,7 @@ def unsubscribe(sub: UnsubIn, owner: str = Depends(get_owner)):
     return {"ok": True}
 
 
-def _broadcast(payload: dict, subs: list | None = None) -> int:
+def _broadcast(payload: dict, subs: list | None = None, errors: list | None = None) -> int:
     sent = 0
     for s in (subs if subs is not None else db.list_subscriptions()):
         try:
@@ -62,8 +62,11 @@ def _broadcast(payload: dict, subs: list | None = None) -> int:
             code = getattr(e.response, "status_code", None)
             if code in (404, 410):  # subscription gone — forget it
                 db.delete_subscription(s["endpoint"])
-        except Exception:
-            pass  # transient send failure — keep the sub, retry next tick
+            elif errors is not None:
+                errors.append(f"push {code}: {e}"[:200])
+        except Exception as e:  # transient send failure — keep the sub, retry next tick
+            if errors is not None:
+                errors.append(f"push {type(e).__name__}: {e}"[:200])
     return sent
 
 
@@ -104,7 +107,9 @@ def test_push(secret: str = Query(""), x_device_id: str | None = Header(default=
     _guard(secret)
     # Scope to the calling device when it sends its id; otherwise notify everyone.
     subs = db.list_subscriptions(x_device_id) if x_device_id else None
-    return {"sent": _broadcast({"title": "🚌 BabaBus", "body": "Push notifications are working!"}, subs)}
+    errors: list = []
+    sent = _broadcast({"title": "🚌 BabaBus", "body": "Push notifications are working!"}, subs, errors)
+    return {"sent": sent, "errors": errors[:8]}
 
 
 @router.post("/tick")
@@ -130,6 +135,7 @@ def tick(secret: str = Query("")):
     stops_by_id = None  # built lazily — only when a fresh location needs the hint
     loc_by_owner: dict = {}
     pushed = []
+    errors: list = []
     for s in db.list_schedules():
         if not s["enabled"] or not within_window(now_min, s["start_time"], s["end_time"]):
             continue
@@ -158,15 +164,21 @@ def tick(secret: str = Query("")):
             ]
             body = " · ".join(parts)
             # With a fresh location fix, add walk time and which bus is catchable.
-            owner = s.get("owner")
-            if owner not in loc_by_owner:
-                loc_by_owner[owner] = db.get_location(owner) if owner else None
-            if loc_by_owner[owner]:
-                if stops_by_id is None:
-                    stops_by_id = {st.id: st for st in ds.get_stops()}
-                hint = _catch_hint(loc_by_owner[owner], stops_by_id.get(s["stop_id"]), rows, now)
-                if hint:
-                    body = f"{hint}\n{body}"  # catchability first — it's the actionable line
+            # Strictly best-effort: a failure here (missing table, slow lookup…)
+            # must never cost the user the alarm push itself.
+            try:
+                owner = s.get("owner")
+                if owner not in loc_by_owner:
+                    loc_by_owner[owner] = db.get_location(owner) if owner else None
+                if loc_by_owner[owner]:
+                    if stops_by_id is None:
+                        stops_by_id = {st.id: st for st in ds.get_stops()}
+                    hint = _catch_hint(loc_by_owner[owner], stops_by_id.get(s["stop_id"]), rows, now)
+                    if hint:
+                        body = f"{hint}\n{body}"  # catchability first — it's the actionable line
+            except Exception as e:
+                loc_by_owner[s.get("owner")] = None  # don't retry a failing lookup per alarm
+                errors.append(f"hint: {type(e).__name__}: {e}"[:200])
         else:
             body = "no live timing right now"
 
@@ -182,10 +194,16 @@ def tick(secret: str = Query("")):
             continue
 
         title = s["label"] or f"🚌 {s['stop_id']}"
-        _broadcast({"title": title, "body": body, "tag": f"alarm-{s['id']}"}, targets)
+        sent = _broadcast({"title": title, "body": body, "tag": f"alarm-{s['id']}"}, targets, errors)
         db.set_last_push(s["id"], now_epoch)
         if apple_due:
             db.set_last_apple_push(s["id"], now_epoch)
-        pushed.append({"id": s["id"], "body": body})
+        pushed.append({"id": s["id"], "sent": sent, "body": body})
 
-    return {"now": now.strftime("%H:%M"), "subscribers": len(all_subs), "pushed": pushed}
+    # errors makes silent failures visible when eyeballing the cron/curl output.
+    return {
+        "now": now.strftime("%H:%M"),
+        "subscribers": len(all_subs),
+        "pushed": pushed,
+        "errors": errors[:8],
+    }

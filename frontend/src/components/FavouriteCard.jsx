@@ -14,6 +14,7 @@ const POLL_MS = 15000;
 export default function FavouriteCard({
   fav, onShowBus, onShowRoute, onCreateStationAlarm,
   watchedBuses, onToggleWatchBus, onQuickAlarm, onRename, onDelete, onRemoveStop,
+  alarmFor, onCancelAlarm, onOpenAlarms,
 }) {
   const [data, setData] = useState(null);
   const [error, setError] = useState(false);
@@ -80,7 +81,8 @@ export default function FavouriteCard({
         <ArrivalRow key={svc.service_no} svc={svc} stopId={fav.stop_id} stopName={data.stop_name}
           onShowBus={onShowBus} onShowRoute={onShowRoute} onQuickAlarm={onQuickAlarm}
           watching={isWatching(svc)}
-          onToggleWatch={toggleWatch} />
+          onToggleWatch={toggleWatch}
+          alarmFor={alarmFor} onCancelAlarm={onCancelAlarm} onOpenAlarms={onOpenAlarms} />
       ))}
       {hiddenCount > 0 && (
         <button className="showall" onClick={() => setShowAll(!showAll)}>

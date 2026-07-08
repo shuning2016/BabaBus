@@ -258,6 +258,26 @@ def test_tick_no_hint_without_or_with_stale_location(monkeypatch):
     assert len(sent) == 1 and "🚶" not in sent[0]["body"]
 
 
+def test_tick_survives_broken_location_lookup(monkeypatch):
+    """Regression: the catch hint is best-effort. If the location lookup blows
+    up (e.g. missing table in prod), the alarm push must still go out and the
+    failure must be reported in the tick response, not swallowed."""
+    sent = []
+    monkeypatch.setattr(push_router, "send_web_push", lambda sub, payload: sent.append(payload))
+
+    def boom(owner):
+        raise RuntimeError("no such table: locations")
+
+    monkeypatch.setattr(push_router.db, "get_location", boom)
+    client.post("/api/push/subscribe", json={"endpoint": "e", "p256dh": "k", "auth": "a"})
+    client.post("/api/schedules", json={"stop_id": "01029", "services": ["7"], "label": "x", **ALL_DAY})
+
+    body = client.post("/api/push/tick", params={"secret": SECRET}).json()
+    assert len(sent) == 1                       # the alarm still went out
+    assert "🚶" not in sent[0]["body"]          # just without the hint
+    assert any("hint" in e for e in body["errors"])  # and the failure is visible
+
+
 def test_catch_hint_picks_earliest_catchable_bus():
     from types import SimpleNamespace as NS
 

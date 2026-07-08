@@ -4,20 +4,37 @@ import CapacityBar from './CapacityBar';
 /**
  * One service's live arrivals row — shared by stop cards and favourite cards.
  * Chip click toggles the bus in/out of "my watching buses" (orange = watching).
- * 🔔 = quick alarm (this bus, this stop, now → +30 min). 🗺️ = route on map.
+ * The bell reflects this bus's alarm state and toggles it:
+ *   🔔 plain          → no alarm; tap = quick alarm (now → +30 min)
+ *   🔔 orange, pulsing → alarm running right now; tap = cancel it
+ *   ⏰ outlined        → alarm set for a later window; tap = cancel it
+ * (If the bus is covered by a multi-bus alarm, tapping opens the Alarms tab
+ * instead of cancelling — cancelling would silence the other buses too.)
+ * 🗺️ = route on map.
  */
 export default function ArrivalRow({
   svc, stopId, stopName,
   onShowBus, onShowRoute, onToggleWatch, watching, onQuickAlarm,
+  alarmFor, onCancelAlarm, onOpenAlarms,
 }) {
-  const [ringing, setRinging] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const alarm = alarmFor ? alarmFor(stopId, svc.service_no) : null;
 
-  const ring = () => {
-    Promise.resolve(onQuickAlarm(svc.service_no, stopId, stopName)).then(() => {
-      setRinging(true);
-      setTimeout(() => setRinging(false), 1500);
-    });
+  const bellClick = () => {
+    if (busy) return;
+    const settle = (p) => { setBusy(true); Promise.resolve(p).then(() => setBusy(false), () => setBusy(false)); };
+    if (!alarm) return settle(onQuickAlarm(svc.service_no, stopId, stopName));
+    if (alarm.schedule.services.length === 1 && onCancelAlarm) return settle(onCancelAlarm(alarm.schedule));
+    return onOpenAlarms && onOpenAlarms();
   };
+
+  const bellTitle = !alarm
+    ? 'Alarm this bus here for the next 30 min'
+    : alarm.schedule.services.length !== 1
+      ? 'Covered by a multi-bus alarm — tap to manage in Alarms'
+      : alarm.running
+        ? `Alarm running until ${alarm.schedule.end_time} — tap to cancel`
+        : `Alarm set for ${alarm.schedule.start_time}–${alarm.schedule.end_time} — tap to cancel`;
 
   return (
     <div className="row">
@@ -43,8 +60,11 @@ export default function ArrivalRow({
         <button className="plain" title="View route on map"
           onClick={() => onShowRoute(svc.service_no)}>🗺️</button>
         {onQuickAlarm && (
-          <button className="plain" title="Alarm this bus here for the next 30 min"
-            onClick={ring}>{ringing ? '✅' : '🔔'}</button>
+          <button
+            className={`plain bell ${alarm ? (alarm.running ? 'bell-live' : 'bell-set') : ''}`}
+            title={bellTitle} onClick={bellClick}>
+            {busy ? '⏳' : alarm ? (alarm.running ? '🔔' : '⏰') : '🔔'}
+          </button>
         )}
       </div>
     </div>

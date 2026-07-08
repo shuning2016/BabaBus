@@ -8,6 +8,7 @@ const POLL_MS = 15000;
 export default function StopCard({
   stop, onShowBus, onShowRoute, onFavourite, onCreateStationAlarm,
   watchedBuses, onToggleWatchBus, onQuickAlarm,
+  alarmFor, onCancelAlarm, onOpenAlarms,
   defaultOpen = false, autoAlarm = false, onAutoAlarmHandled,
 }) {
   const [open, setOpen] = useState(defaultOpen);
@@ -83,7 +84,8 @@ export default function StopCard({
                 onShowBus={onShowBus} onShowRoute={onShowRoute}
                 watching={isWatching(svc)}
                 onToggleWatch={toggle}
-                onQuickAlarm={onQuickAlarm} />
+                onQuickAlarm={onQuickAlarm}
+                alarmFor={alarmFor} onCancelAlarm={onCancelAlarm} onOpenAlarms={onOpenAlarms} />
             ))}
             {watchingRows.length > 0 && watchingRows.length < data.services.length && (
               <button className="showall" onClick={() => setShowAll(!showAll)}>

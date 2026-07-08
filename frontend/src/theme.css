@@ -139,6 +139,13 @@ button, input, select, a { touch-action: manipulation; -webkit-tap-highlight-col
 .bar.on { background: var(--shopee-orange); }
 button.plain { background: none; border: none; cursor: pointer; font-size: 16px; padding: 3px; border-radius: 6px; }
 button.plain:hover { background: #F4F5F7; }
+/* Bell alarm states: outlined = set for later, filled + pulse = running now */
+button.plain.bell-set { background: #FFF3EF; box-shadow: inset 0 0 0 1.5px var(--shopee-orange); border-radius: 8px; }
+button.plain.bell-live { background: var(--shopee-orange); border-radius: 8px; animation: bellpulse 1.6s ease-out infinite; }
+@keyframes bellpulse {
+  0% { box-shadow: 0 0 0 0 rgba(238, 77, 45, .45); }
+  100% { box-shadow: 0 0 0 9px rgba(238, 77, 45, 0); }
+}
 .stale { color: var(--shopee-red); font-size: 11px; font-weight: 700; margin: 6px 0 0; }
 
 /* ---------- Favourite / Nearby panes ---------- */
