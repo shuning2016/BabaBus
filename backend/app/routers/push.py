@@ -21,7 +21,10 @@ APPLE_MIN_MINUTES = 5
 WALK_MPS = 1.33
 WALK_DETOUR = 1.25
 CATCH_BUFFER_MIN = 1  # need this much slack on top of the walk to board safely
-LOCATION_FRESH_S = 15 * 60  # ignore location fixes older than this
+# The app can only report location while open (web has no background GPS), so
+# trust the last fix for a while; beyond that fall back to where the alarm was
+# CREATED — people usually set an alarm at the place they'll leave from.
+LOCATION_FRESH_S = 60 * 60
 router = APIRouter(prefix="/api/push")
 
 
@@ -170,10 +173,14 @@ def tick(secret: str = Query("")):
                 owner = s.get("owner")
                 if owner not in loc_by_owner:
                     loc_by_owner[owner] = db.get_location(owner) if owner else None
-                if loc_by_owner[owner]:
+                loc = loc_by_owner[owner]
+                if not (loc and now_epoch - loc["updated"] <= LOCATION_FRESH_S) and s.get("loc_lat") is not None:
+                    # no fresh fix (app closed for a while) — use the alarm's creation spot
+                    loc = {"lat": s["loc_lat"], "lon": s["loc_lon"], "updated": now_epoch}
+                if loc:
                     if stops_by_id is None:
                         stops_by_id = {st.id: st for st in ds.get_stops()}
-                    hint = _catch_hint(loc_by_owner[owner], stops_by_id.get(s["stop_id"]), rows, now)
+                    hint = _catch_hint(loc, stops_by_id.get(s["stop_id"]), rows, now)
                     if hint:
                         body = f"{hint}\n{body}"  # catchability first — it's the actionable line
             except Exception as e:

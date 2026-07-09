@@ -251,13 +251,35 @@ def test_tick_no_hint_without_or_with_stale_location(monkeypatch):
     client.post("/api/push/tick", params={"secret": SECRET})
     assert len(sent) == 1 and "🚶" not in sent[0]["body"]
 
-    # An hour-old fix is stale → still no hint.
+    # A two-hour-old fix is stale, and this alarm was created with no location
+    # snapshot to fall back on → still no hint.
     sent.clear()
     now = int(datetime.now(SGT).timestamp())
-    db.set_location("test-device", 1.2982, 103.8541, now - 3600)
+    db.set_location("test-device", 1.2982, 103.8541, now - 7200)
     db.set_last_push(created["id"], now - 600)
     client.post("/api/push/tick", params={"secret": SECRET})
     assert len(sent) == 1 and "🚶" not in sent[0]["body"]
+
+
+def test_tick_hint_falls_back_to_alarm_creation_spot(monkeypatch):
+    """App closed for hours → device fix is stale, but the alarm remembers
+    where it was created and the hint still shows (people set alarms at the
+    place they leave from)."""
+    sent = []
+    monkeypatch.setattr(push_router, "send_web_push", lambda sub, payload: sent.append(payload))
+    client.post("/api/push/subscribe", json={"endpoint": "e", "p256dh": "k", "auth": "a"})
+    client.post("/api/location", json={"lat": 1.2982, "lon": 103.8541})  # fresh at creation
+    created = client.post("/api/schedules", json={"stop_id": "01029", "services": ["7"], "label": "x", **ALL_DAY}).json()
+
+    now = int(datetime.now(SGT).timestamp())
+    db.set_location("test-device", 1.2982, 103.8541, now - 7200)  # fix goes stale
+    client.post("/api/push/tick", params={"secret": SECRET})
+    assert len(sent) == 1
+    assert "🚶" in sent[0]["body"]  # hint survives via the creation snapshot
+
+    # Sanity: the snapshot really was stored on the schedule row.
+    row = next(r for r in db.list_schedules() if r["id"] == created["id"])
+    assert row["loc_lat"] == 1.2982 and row["loc_lon"] == 103.8541
 
 
 def test_tick_survives_broken_location_lookup(monkeypatch):

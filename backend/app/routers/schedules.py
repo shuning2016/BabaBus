@@ -1,3 +1,5 @@
+import time
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
@@ -43,8 +45,19 @@ def list_all(owner: str = Depends(get_owner)):
 @router.post("")
 def create(s: ScheduleIn, owner: str = Depends(get_owner)):
     csv = ",".join(s.services)
+    # Snapshot where the alarm was created (the app just reported its location
+    # on open): the catch hint's fallback when there's no fresh fix at push
+    # time — people usually set an alarm at the place they'll leave from.
+    loc_lat = loc_lon = None
+    try:
+        loc = db.get_location(owner)
+        if loc and int(time.time()) - loc["updated"] <= 15 * 60:
+            loc_lat, loc_lon = loc["lat"], loc["lon"]
+    except Exception:
+        pass  # best-effort — never block alarm creation
     schedule_id = db.add_schedule(
-        s.stop_id, csv, s.start_time, s.end_time, s.label, s.remind_every, s.days, owner=owner
+        s.stop_id, csv, s.start_time, s.end_time, s.label, s.remind_every, s.days,
+        owner=owner, loc_lat=loc_lat, loc_lon=loc_lon,
     )
     return {"id": schedule_id, "enabled": True, **s.model_dump()}
 

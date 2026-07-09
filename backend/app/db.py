@@ -120,6 +120,8 @@ def init_db(path: Optional[str] = None) -> None:
         ("last_apple_push", "INTEGER"),  # iOS is notified once per window, tracked separately
         ("days", "TEXT NOT NULL DEFAULT '1111111'"),  # Mon..Sun mask
         ("services", "TEXT NOT NULL DEFAULT ''"),  # CSV of monitored bus nos; '' = all buses
+        ("loc_lat", "REAL"),  # where the user was when creating the alarm —
+        ("loc_lon", "REAL"),  # catch-hint fallback when no fresh fix exists
     ):
         try:
             _run(f"ALTER TABLE schedules ADD COLUMN {col} {decl}", path=path)
@@ -237,14 +239,17 @@ def add_schedule(
     remind_every: int = 1,
     days: str = "1111111",
     owner: Optional[str] = None,
+    loc_lat: Optional[float] = None,
+    loc_lon: Optional[float] = None,
     path: Optional[str] = None,
 ) -> int:
     # service_no is legacy + NOT NULL; keep it populated with the first service.
     first = services.split(",")[0] if services else ""
     return _run(
-        "INSERT INTO schedules (stop_id, service_no, services, start_time, end_time, label, remind_every, days, owner)"
-        " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        (stop_id, first, services, start_time, end_time, label, remind_every, days, owner),
+        "INSERT INTO schedules"
+        " (stop_id, service_no, services, start_time, end_time, label, remind_every, days, owner, loc_lat, loc_lon)"
+        " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (stop_id, first, services, start_time, end_time, label, remind_every, days, owner, loc_lat, loc_lon),
         path=path,
     )["lastrowid"]
 
