@@ -158,18 +158,27 @@ export default function App() {
     try { cached = JSON.parse(localStorage.getItem('bababus-last-pos')); } catch { /* ignore */ }
     if (cached?.lat) loadAt(cached.lat, cached.lon);
     if (!navigator.geolocation) return cached?.lat ? null : loadAt(DEFAULT_CENTER.lat, DEFAULT_CENTER.lon);
+    const gotFix = (pos) => {
+      const lat = pos.coords.latitude;
+      const lon = pos.coords.longitude;
+      try { localStorage.setItem('bababus-last-pos', JSON.stringify({ lat, lon })); } catch { /* ignore */ }
+      // share the fix so alarm pushes can say which bus is catchable from here
+      reportLocation(lat, lon).catch(() => {});
+      if (!cached?.lat || approxMetres([lat, lon], [cached.lat, cached.lon]) > 150) loadAt(lat, lon);
+    };
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const lat = pos.coords.latitude;
-        const lon = pos.coords.longitude;
-        try { localStorage.setItem('bababus-last-pos', JSON.stringify({ lat, lon })); } catch { /* ignore */ }
-        // share the fix so alarm pushes can say which bus is catchable from here
-        reportLocation(lat, lon).catch(() => {});
-        if (!cached?.lat || approxMetres([lat, lon], [cached.lat, cached.lon]) > 150) loadAt(lat, lon);
+      gotFix,
+      () => {
+        if (!cached?.lat) loadAt(DEFAULT_CENTER.lat, DEFAULT_CENTER.lon);
+        // The quick attempt timed out (weak GPS indoors). The map already shows
+        // the remembered spot, but the alarm's catch hint needs a real reported
+        // fix — keep trying patiently in the background.
+        navigator.geolocation.getCurrentPosition(gotFix, () => {}, {
+          maximumAge: 5 * 60000, timeout: 60000,
+        });
       },
-      () => { if (!cached?.lat) loadAt(DEFAULT_CENTER.lat, DEFAULT_CENTER.lon); },
       // a slightly stale fix beats waiting: don't stall the map for a fresh lock
-      { maximumAge: 60000, timeout: 8000 }
+      { maximumAge: 5 * 60000, timeout: 8000 }
     );
     return null;
   };
