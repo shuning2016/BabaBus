@@ -8,7 +8,10 @@ function AlarmRow({ s, live, onChanged }) {
   const [avail, setAvail] = useState(null);   // service numbers at the stop
   const [editingBuses, setEditingBuses] = useState(false);
 
-  const patch = (fields) => updateSchedule(s.id, fields).then(onChanged);
+  // Refresh even when the call fails: if this card is stale (deleted elsewhere,
+  // served from the local cache), re-syncing removes it — otherwise the buttons
+  // feel dead because the error was silently swallowed.
+  const patch = (fields) => updateSchedule(s.id, fields).then(onChanged, onChanged);
   const saveLabel = () => {
     const v = label.trim();
     if (v && v !== s.label) patch({ label: v }); else setLabel(s.label);
@@ -36,8 +39,9 @@ function AlarmRow({ s, live, onChanged }) {
         <input className="alarmname" value={label}
           onChange={(e) => setLabel(e.target.value)} onBlur={saveLabel}
           onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()} />
+        {!s.enabled && <span className="pausedtag">paused</span>}
         <button className="plain" title={s.enabled ? 'Pause' : 'Resume'} onClick={() => patch({ enabled: !s.enabled })}>{s.enabled ? '⏰' : '💤'}</button>
-        <button className="plain" title="Delete alarm" onClick={() => deleteSchedule(s.id).then(onChanged)}>🗑</button>
+        <button className="plain" title="Delete alarm" onClick={() => deleteSchedule(s.id).then(onChanged, onChanged)}>🗑</button>
       </div>
 
       <div className="aflabel">Watching {monitored.length ? `${monitored.length} bus(es)` : 'all buses'}

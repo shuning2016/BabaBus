@@ -160,8 +160,14 @@ button.plain.bell-live { background: var(--shopee-orange); border-radius: 8px; a
 .alarmbanner { background: #FFF7E0; border-left: 4px solid var(--shopee-yellow); color: var(--navy); border-radius: 10px; padding: 10px 14px; margin-bottom: 10px; font-size: 14px; }
 .favchip { background: var(--shopee-yellow); color: var(--navy); border-radius: 8px; padding: 1px 7px; font-size: 11px; font-weight: 700; margin-left: 4px; }
 
-/* Editable alarm cards (Alarms tab) */
-.alarmcard.paused { opacity: .55; }
+/* Editable alarm cards (Alarms tab). Paused: body fades but the header row
+   (name · paused tag · resume/delete buttons) stays fully tappable-looking —
+   a whole-card fade read as "disabled, can't touch". */
+.alarmcard.paused > *:not(.cardhead) { opacity: .45; }
+.pausedtag {
+  background: #E9ECF2; color: var(--muted); border-radius: 999px; padding: 3px 10px;
+  font-size: 10px; font-weight: 900; text-transform: uppercase; letter-spacing: .5px; flex: none;
+}
 .alarmcard .cardhead { align-items: center; }
 .alarmname { flex: 1; min-width: 0; border: none; border-bottom: 1.5px solid transparent; background: none; font-family: inherit; font-size: 15px; font-weight: 700; color: var(--navy); padding: 3px 2px; }
 .alarmname:hover { border-bottom-color: var(--line); }
