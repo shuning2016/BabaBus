@@ -11,7 +11,7 @@ const ORANGE = '#EE4D2D';
    no jumps. The target = last real fix advanced toward the bus's destination
    stop at a deliberately conservative speed: undershooting means corrections
    are gentle forward speed-ups; overshooting would force backward slides. */
-const SPEED_FACTOR = 0.7;  // predict at 70% of the ETA-implied speed
+const SPEED_FACTOR = 0.6;  // predict at 60% of the ETA-implied speed
 const PREDICT_CAP_S = 25;  // no fresh data for this long → pause (bus may be dwelling)
 const CHASE_PER_S = 0.6;   // easing: close ~this fraction of the gap per second
 const MAX_MPS = 16;        // never predict faster than ~58 km/h
@@ -132,9 +132,16 @@ function AnimatedBuses({ buses, onQuickAlarmBus }) {
         const age = Math.min((now - m.fix.at) / 1000, PREDICT_CAP_S);
         const tgtLat = m.fix.lat + m.vel.vlat * age;
         const tgtLon = m.fix.lon + m.vel.vlon * age;
-        m.pos.lat += (tgtLat - m.pos.lat) * k;
-        m.pos.lon += (tgtLon - m.pos.lon) * k;
-        m.marker.setLatLng([m.pos.lat, m.pos.lon]);
+        const stepLat = (tgtLat - m.pos.lat) * k;
+        const stepLon = (tgtLon - m.pos.lon) * k;
+        // Buses never reverse: if the correction points against the direction
+        // of travel (we predicted ahead of a dwelling bus), hold still and let
+        // reality catch up instead of sliding backward.
+        if (stepLat * m.vel.vlat + stepLon * m.vel.vlon >= 0) {
+          m.pos.lat += stepLat;
+          m.pos.lon += stepLon;
+          m.marker.setLatLng([m.pos.lat, m.pos.lon]);
+        }
       });
       raf = requestAnimationFrame(tick);
     };
@@ -150,8 +157,14 @@ function AnimatedBuses({ buses, onQuickAlarmBus }) {
       const vel = velocityToward(fix, b.dest, b.eta_s);
       const existing = store.current.get(b.id);
       if (existing) {
-        existing.fix = fix;
-        existing.vel = vel;
+        // Only accept the sample as a NEW fix if the bus actually moved.
+        // Refreshes often re-serve the same position (cache / LTA cadence);
+        // resetting the prediction to it would yank the marker backward and
+        // make buses seesaw on every poll.
+        if (approxMetres([b.lat, b.lon], [existing.fix.lat, existing.fix.lon]) > 8) {
+          existing.fix = fix;
+          existing.vel = vel;
+        }
         // A big gap means stale data from a long background — snap, don't chase.
         if (approxMetres([b.lat, b.lon], [existing.pos.lat, existing.pos.lon]) > 500) {
           existing.pos = { lat: b.lat, lon: b.lon };
