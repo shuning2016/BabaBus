@@ -260,14 +260,19 @@ export default function App() {
         )
       ).then((lists) => {
         if (!alive) return;
-        const seen = new Map();
+        // Dedup only TRUE duplicates: the same physical bus reported by two
+        // stops' feeds (coords within metres). The old 111 m grid also merged
+        // genuinely bunched buses — the swallowed one then "suddenly appeared"
+        // when the pair separated.
+        const kept = [];
         lists.flat().forEach((b) => {
-          const key = `${b.service_no}:${b.lat.toFixed(3)}:${b.lon.toFixed(3)}`;
-          if (!seen.has(key) && (!lastLoad.current || approxMetres([b.lat, b.lon], lastLoad.current) < 2000)) {
-            seen.set(key, b);
-          }
+          if (lastLoad.current && approxMetres([b.lat, b.lon], lastLoad.current) >= 2000) return;
+          const dup = kept.some(
+            (k) => k.service_no === b.service_no && approxMetres([k.lat, k.lon], [b.lat, b.lon]) < 40
+          );
+          if (!dup) kept.push(b);
         });
-        const withIds = assignBusIds(prevBuses.current, [...seen.values()]);
+        const withIds = assignBusIds(prevBuses.current, kept);
         // Keep briefly-missing buses in the matching pool so a bus that skips
         // one poll (feed flicker) reclaims its id instead of spawning a
         // duplicate marker next to its grace-period ghost.
