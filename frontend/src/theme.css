@@ -242,6 +242,25 @@ button.plain.bell-live { background: var(--shopee-orange); border-radius: 8px; a
 
 /* ---------- Map ---------- */
 .leaflet-marker-icon { transition: opacity 1.8s; } /* new buses fade in, no pop */
+
+/* Bus-motion disclaimer (免责声明): expanded card on first visit, ⓘ chip after */
+.mapnote-chip {
+  position: absolute; left: 12px; bottom: calc(94px + env(safe-area-inset-bottom, 0)); z-index: 1000;
+  background: rgba(255,255,255,.92); color: var(--muted); border: none; border-radius: 999px;
+  padding: 5px 11px; font-family: inherit; font-size: 11px; font-weight: 700; cursor: pointer;
+  box-shadow: 0 2px 8px rgba(23,43,77,.18);
+}
+.mapnote-card {
+  position: absolute; left: 12px; right: 12px; bottom: calc(66px + env(safe-area-inset-bottom, 0));
+  z-index: 1100; /* above Leaflet's zoom control while it's being read */
+  background: #fff; border-radius: 14px; padding: 14px 16px;
+  box-shadow: 0 8px 30px rgba(23,43,77,.28); max-width: 420px; margin: 0 auto;
+}
+.mapnote-card h4 { font-size: 13px; color: var(--navy); margin: 0 0 8px; }
+.mapnote-card ul { margin: 0; padding-left: 16px; }
+.mapnote-card li { font-size: 12px; line-height: 1.55; color: var(--ink); margin-bottom: 7px; }
+.mapnote-card .en { color: var(--muted); }
+.mapnote-ok { display: block; margin: 4px 0 0 auto; }
 .mapclose { position: absolute; top: 12px; left: 12px; z-index: 1000; background: #fff; color: var(--navy); border: none; border-radius: 999px; padding: 8px 14px; font-size: 12px; font-weight: 700; cursor: pointer; font-family: inherit; box-shadow: 0 2px 8px rgba(0,0,0,.2); }
 .leaflet-control-zoom { border: none !important; box-shadow: 0 2px 8px rgba(0,0,0,.2) !important; border-radius: 10px !important; overflow: hidden; margin: 0 12px 20px 0 !important; }
 .leaflet-control-zoom a { color: var(--navy) !important; font-weight: 700 !important; }

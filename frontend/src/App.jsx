@@ -8,6 +8,7 @@ import AlarmsPanel from './components/AlarmsPanel';
 import FloatingAlarms from './components/FloatingAlarms';
 import NotificationHelp from './components/NotificationHelp';
 import AccountButton from './components/AccountButton';
+import MapNote from './components/MapNote';
 import { deviceId } from './device';
 import { sessionToken, setSessionToken } from './session';
 import useAlarms from './useAlarms';
@@ -446,6 +447,7 @@ export default function App() {
           {mapTarget && (
             <button className="mapclose" onClick={() => setMapTarget(null)}>✕ back to explore</button>
           )}
+          <MapNote />
           <BusMap target={mapTarget} stops={stops} buses={areaBuses} active={tab === 'map'}
             onPickPoint={onPickPoint} onMapMove={onMapMove} onAlarmStop={onAlarmStop}
             watchedBuses={watchedBuses} onToggleWatchBus={onToggleWatchBus}
