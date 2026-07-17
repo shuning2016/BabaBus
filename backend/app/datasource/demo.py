@@ -61,12 +61,12 @@ class DemoDataSource(DataSource):
                     etas=etas,
                     load=load,
                     prev_interval_min=HEADWAY_SECONDS // 60,
-                    bus_positions=self._positions(service_no, now),
+                    bus_positions=self._positions(service_no, now, i),
                 )
             )
         return out
 
-    def _positions(self, service_no: str, now: float) -> list[dict]:
+    def _positions(self, service_no: str, now: float, stop_i: int) -> list[dict]:
         ids = self.routes[service_no]
         total = HOP_SECONDS * (len(ids) - 1)
         positions = []
@@ -77,10 +77,13 @@ class DemoDataSource(DataSource):
                 seg = min(int(elapsed // HOP_SECONDS), len(ids) - 2)
                 frac = (elapsed - seg * HOP_SECONDS) / HOP_SECONDS
                 a, b = self.stops[ids[seg]], self.stops[ids[seg + 1]]
+                # this bus reaches stop stop_i at k*HEADWAY + stop_i*HOP
+                eta_min = round((k * HEADWAY_SECONDS + stop_i * HOP_SECONDS - now) / 60)
                 positions.append(
                     {
                         "lat": a.lat + (b.lat - a.lat) * frac,
                         "lon": a.lon + (b.lon - a.lon) * frac,
+                        "eta_min": eta_min,
                     }
                 )
             k -= 1

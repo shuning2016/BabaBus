@@ -15,6 +15,12 @@ const SPEED_FACTOR = 0.6;  // predict at 60% of the ETA-implied speed
 const PREDICT_CAP_S = 25;  // no fresh data for this long → pause (bus may be dwelling)
 const CHASE_PER_S = 0.6;   // easing: close ~this fraction of the gap per second
 const MAX_MPS = 16;        // never predict faster than ~58 km/h
+const MAX_VISUAL_MPS = 25; // hard on-screen speed limit (~90 km/h): corrections
+                           // move at bus speed, never as a supersonic slide
+const GRACE_MS = 40000;    // keep a bus that vanished from one poll this long —
+                           // blips (failed fetch, feed flicker) shouldn't delete it
+const BACK_TOLERANCE_M = 80; // hold small backward corrections (dwell overshoot);
+                             // beyond this, reality wins and the marker drives back
 const M_PER_DEG = 111320;
 
 /** Velocity (degrees/second) from a fix toward the destination stop at the
@@ -132,12 +138,25 @@ function AnimatedBuses({ buses, onQuickAlarmBus }) {
         const age = Math.min((now - m.fix.at) / 1000, PREDICT_CAP_S);
         const tgtLat = m.fix.lat + m.vel.vlat * age;
         const tgtLon = m.fix.lon + m.vel.vlon * age;
-        const stepLat = (tgtLat - m.pos.lat) * k;
-        const stepLon = (tgtLon - m.pos.lon) * k;
-        // Buses never reverse: if the correction points against the direction
-        // of travel (we predicted ahead of a dwelling bus), hold still and let
-        // reality catch up instead of sliding backward.
-        if (stepLat * m.vel.vlat + stepLon * m.vel.vlon >= 0) {
+        let stepLat = (tgtLat - m.pos.lat) * k;
+        let stepLon = (tgtLon - m.pos.lon) * k;
+        const cosLat = Math.cos((m.pos.lat * Math.PI) / 180);
+        const gapM = Math.hypot((tgtLat - m.pos.lat) * M_PER_DEG, (tgtLon - m.pos.lon) * M_PER_DEG * cosLat);
+        // Hard speed limit: however large the correction, the marker moves at
+        // plausible bus speed — big gaps become a drive, not a teleport-slide.
+        const stepM = Math.hypot(stepLat * M_PER_DEG, stepLon * M_PER_DEG * cosLat);
+        const maxM = MAX_VISUAL_MPS * dt;
+        if (stepM > maxM) {
+          const s = maxM / stepM;
+          stepLat *= s;
+          stepLon *= s;
+        }
+        // Small backward corrections are dwell overshoot — hold and let reality
+        // catch up. But past BACK_TOLERANCE_M reality wins even backward:
+        // vetoing forever left the marker stuck until the 500 m snap, which
+        // showed as buses teleporting/"suddenly appearing" on a refresh.
+        const backward = stepLat * m.vel.vlat + stepLon * m.vel.vlon < 0;
+        if (!backward || gapM > BACK_TOLERANCE_M) {
           m.pos.lat += stepLat;
           m.pos.lon += stepLon;
           m.marker.setLatLng([m.pos.lat, m.pos.lon]);
@@ -150,13 +169,15 @@ function AnimatedBuses({ buses, onQuickAlarmBus }) {
   }, []);
 
   useEffect(() => {
+    const now = performance.now();
     const seen = new Set();
     buses.forEach((b) => {
       seen.add(b.id);
-      const fix = { lat: b.lat, lon: b.lon, at: performance.now() };
+      const fix = { lat: b.lat, lon: b.lon, at: now };
       const vel = velocityToward(fix, b.dest, b.eta_s);
       const existing = store.current.get(b.id);
       if (existing) {
+        existing.lastSeen = now;
         // Only accept the sample as a NEW fix if the bus actually moved.
         // Refreshes often re-serve the same position (cache / LTA cadence);
         // resetting the prediction to it would yank the marker backward and
@@ -174,14 +195,23 @@ function AnimatedBuses({ buses, onQuickAlarmBus }) {
           existing.marker.setPopupContent(busPopupContent(b, onQuickAlarmBus));
         }
       } else {
-        const marker = L.marker([b.lat, b.lon], { icon: busChipIcon(b.service_no), zIndexOffset: 500 })
+        // Fade new buses in: entering the feed's window is normal (LTA only
+        // exposes the next ~3 arrivals per stop), but popping in reads as a bug.
+        const marker = L.marker([b.lat, b.lon], { icon: busChipIcon(b.service_no), zIndexOffset: 500, opacity: 0 })
           .bindPopup(busPopupContent(b, onQuickAlarmBus))
           .addTo(map);
-        store.current.set(b.id, { marker, fix, vel, pos: { lat: b.lat, lon: b.lon } });
+        setTimeout(() => marker.setOpacity(1), 60);
+        store.current.set(b.id, { marker, fix, vel, pos: { lat: b.lat, lon: b.lon }, lastSeen: now });
       }
     });
+    // Absent buses get a grace window before removal — a single failed poll or
+    // feed flicker must not blink them off the map. (Prediction pauses on its
+    // own via PREDICT_CAP_S while they wait.)
     store.current.forEach((m, id) => {
-      if (!seen.has(id)) { map.removeLayer(m.marker); store.current.delete(id); }
+      if (!seen.has(id) && now - (m.lastSeen ?? 0) > GRACE_MS) {
+        map.removeLayer(m.marker);
+        store.current.delete(id);
+      }
     });
   }, [buses, map]);
 

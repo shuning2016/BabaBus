@@ -112,6 +112,9 @@ def test_arrivals_mapping():
     assert svc.etas == [3, 11, 19]
     assert svc.load == "SDA"
     assert svc.prev_interval_min == 8
-    # zero-lat NextBus2 position is filtered out
+    # zero-lat NextBus2 position is filtered out — and each position carries
+    # ITS OWN eta, so the missing middle bus can't shift positions onto the
+    # wrong ETA (positions[1] is the 19-min bus, not the 11-min one).
     assert len(svc.bus_positions) == 2
-    assert svc.bus_positions[0] == {"lat": 1.297, "lon": 103.853}
+    assert svc.bus_positions[0] == {"lat": 1.297, "lon": 103.853, "eta_min": 3}
+    assert svc.bus_positions[1]["eta_min"] == 19

@@ -87,7 +87,10 @@ class LTADataSource(DataSource):
                 etas.append(max(0, round((eta - now).total_seconds() / 60)))
                 lat, lon = float(bus.get("Latitude") or 0), float(bus.get("Longitude") or 0)
                 if lat and lon:
-                    positions.append({"lat": lat, "lon": lon})
+                    # eta_min travels WITH the position: buses without coords
+                    # (still at the interchange) appear in etas but not here, so
+                    # pairing by index downstream mismatches bus and ETA.
+                    positions.append({"lat": lat, "lon": lon, "eta_min": etas[-1]})
             load = (svc.get("NextBus") or {}).get("Load") or "SEA"
             prev = etas[1] - etas[0] if len(etas) >= 2 else 0
             out.append(ServiceArrival(svc["ServiceNo"], etas, load, prev, positions))

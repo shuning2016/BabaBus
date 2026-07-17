@@ -16,7 +16,7 @@ class ServiceArrival:
     etas: list[int]                      # minutes, up to 3
     load: str                            # SEA | SDA | LSD
     prev_interval_min: int
-    bus_positions: list[dict] = field(default_factory=list)  # {"lat","lon"}
+    bus_positions: list[dict] = field(default_factory=list)  # {"lat","lon","eta_min"}
 
 
 @dataclass

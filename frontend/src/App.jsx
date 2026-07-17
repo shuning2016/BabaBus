@@ -84,6 +84,7 @@ export default function App() {
   const push = usePush();
   const lastLoad = useRef(null);
   const prevBuses = useRef([]);
+  const lastGoodBuses = useRef(new Map()); // stopId -> { at, list }: fetch-failure fallback
 
   const refreshFavs = () =>
     getFavourites().then((d) => { setFavourites(d.favourites); writeCache('bababus-favs', d.favourites); });
@@ -243,12 +244,19 @@ export default function App() {
             .then((d) => d.services.flatMap((svc) =>
               // dest + eta let the map dead-reckon: the bus is heading to this
               // stop, so direction and speed are known from the first sample.
-              svc.bus_positions.map((p, i) => ({
+              // eta_min rides on each position (etas[] isn't index-aligned —
+              // buses without coordinates appear there too).
+              svc.bus_positions.map((p) => ({
                 ...p, service_no: svc.service_no, toward: d.stop_name,
                 dest: { lat: s.lat, lon: s.lon },
-                eta_s: Math.max(45, (svc.etas[i] ?? 5) * 60),
+                eta_s: Math.max(45, (p.eta_min ?? svc.etas[0] ?? 5) * 60),
               }))))
-            .catch(() => [])
+            .then((list) => { lastGoodBuses.current.set(s.id, { at: Date.now(), list }); return list; })
+            .catch(() => {
+              // one failed request shouldn't wipe this stop's buses off the map
+              const g = lastGoodBuses.current.get(s.id);
+              return g && Date.now() - g.at < 45000 ? g.list : [];
+            })
         )
       ).then((lists) => {
         if (!alive) return;
@@ -260,7 +268,16 @@ export default function App() {
           }
         });
         const withIds = assignBusIds(prevBuses.current, [...seen.values()]);
-        prevBuses.current = withIds;
+        // Keep briefly-missing buses in the matching pool so a bus that skips
+        // one poll (feed flicker) reclaims its id instead of spawning a
+        // duplicate marker next to its grace-period ghost.
+        const nowT = Date.now();
+        const usedIds = new Set(withIds.map((b) => b.id));
+        const carried = prevBuses.current
+          .filter((p) => !usedIds.has(p.id))
+          .map((p) => ({ ...p, missedAt: p.missedAt ?? nowT }))
+          .filter((p) => nowT - p.missedAt < 45000);
+        prevBuses.current = [...withIds, ...carried];
         setAreaBuses(withIds);
       });
     load();
