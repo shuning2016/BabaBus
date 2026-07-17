@@ -23,6 +23,8 @@ export default function MapNote() {
     <div className="mapnote-card">
       <h4>ⓘ 巴士位置为估算 · Bus positions are estimates</h4>
       <ul>
+        <li>官方 GPS 定位本身存在误差，巴士位置可能与实际略有偏差。<br />
+          <span className="en">The official GPS data itself isn't fully accurate — a bus may be slightly off its true position.</span></li>
         <li>官方数据每 15–60 秒更新一次，其间的移动为平滑模拟。<br />
           <span className="en">Official data updates every 15–60 s; movement in between is simulated smoothly.</span></li>
         <li>巴士临近车站（前 3 班）才会出现，因此会淡入淡出。<br />
