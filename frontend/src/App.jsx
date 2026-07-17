@@ -241,7 +241,13 @@ export default function App() {
         stops.slice(0, 8).map((s) =>
           getArrivals(s.id)
             .then((d) => d.services.flatMap((svc) =>
-              svc.bus_positions.map((p) => ({ ...p, service_no: svc.service_no, toward: d.stop_name }))))
+              // dest + eta let the map dead-reckon: the bus is heading to this
+              // stop, so direction and speed are known from the first sample.
+              svc.bus_positions.map((p, i) => ({
+                ...p, service_no: svc.service_no, toward: d.stop_name,
+                dest: { lat: s.lat, lon: s.lon },
+                eta_s: Math.max(45, (svc.etas[i] ?? 5) * 60),
+              }))))
             .catch(() => [])
         )
       ).then((lists) => {

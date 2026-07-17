@@ -5,7 +5,33 @@ import { getArrivals } from '../api';
 import { approxMetres } from '../geo';
 
 const ORANGE = '#EE4D2D';
-const ANIM_MS = 15000; // buses glide toward their latest position over one poll cycle
+
+/* Dead-reckoned bus motion ("the Uber way"). The displayed bus always CHASES a
+   target with easing — new data moves the target, never the bus, so there are
+   no jumps. The target = last real fix advanced toward the bus's destination
+   stop at a deliberately conservative speed: undershooting means corrections
+   are gentle forward speed-ups; overshooting would force backward slides. */
+const SPEED_FACTOR = 0.7;  // predict at 70% of the ETA-implied speed
+const PREDICT_CAP_S = 25;  // no fresh data for this long → pause (bus may be dwelling)
+const CHASE_PER_S = 0.6;   // easing: close ~this fraction of the gap per second
+const MAX_MPS = 16;        // never predict faster than ~58 km/h
+const M_PER_DEG = 111320;
+
+/** Velocity (degrees/second) from a fix toward the destination stop at the
+ *  ETA-implied speed, scaled down by SPEED_FACTOR. */
+function velocityToward(fix, dest, etaS) {
+  if (!dest || !etaS) return { vlat: 0, vlon: 0 };
+  const cos = Math.cos((fix.lat * Math.PI) / 180);
+  const dLatM = (dest.lat - fix.lat) * M_PER_DEG;
+  const dLonM = (dest.lon - fix.lon) * M_PER_DEG * cos;
+  const dist = Math.hypot(dLatM, dLonM);
+  if (dist < 20) return { vlat: 0, vlon: 0 }; // basically at the stop — hold
+  const mps = Math.min(MAX_MPS, (dist / etaS) * SPEED_FACTOR);
+  return {
+    vlat: ((dLatM / dist) * mps) / M_PER_DEG,
+    vlon: ((dLonM / dist) * mps) / (M_PER_DEG * cos),
+  };
+}
 
 const busIcon = L.divIcon({
   className: '',
@@ -86,22 +112,29 @@ function busPopupContent(bus, onQuickAlarmBus) {
   return div;
 }
 
-/** Live buses rendered as Leaflet markers that tween smoothly toward each
- *  new position (requestAnimationFrame) so they appear to drive along roads. */
+/** Live buses as Leaflet markers in continuous dead-reckoned motion: each
+ *  frame the displayed position eases toward (last fix + predicted advance),
+ *  so buses move from their very first sample and data refreshes bend their
+ *  velocity instead of jumping them. */
 function AnimatedBuses({ buses, onQuickAlarmBus }) {
   const map = useMap();
-  const store = useRef(new Map()); // id -> { marker, from, to, start }
+  const store = useRef(new Map()); // id -> { marker, fix:{lat,lon,at}, vel, pos }
+  const lastFrame = useRef(0);
 
   useEffect(() => {
     let raf;
     const tick = () => {
       const now = performance.now();
+      const dt = Math.min((now - (lastFrame.current || now)) / 1000, 0.1);
+      lastFrame.current = now;
+      const k = Math.min(1, CHASE_PER_S * dt);
       store.current.forEach((m) => {
-        const t = Math.min(1, (now - m.start) / ANIM_MS);
-        m.marker.setLatLng([
-          m.from.lat + (m.to.lat - m.from.lat) * t,
-          m.from.lon + (m.to.lon - m.from.lon) * t,
-        ]);
+        const age = Math.min((now - m.fix.at) / 1000, PREDICT_CAP_S);
+        const tgtLat = m.fix.lat + m.vel.vlat * age;
+        const tgtLon = m.fix.lon + m.vel.vlon * age;
+        m.pos.lat += (tgtLat - m.pos.lat) * k;
+        m.pos.lon += (tgtLon - m.pos.lon) * k;
+        m.marker.setLatLng([m.pos.lat, m.pos.lon]);
       });
       raf = requestAnimationFrame(tick);
     };
@@ -113,16 +146,17 @@ function AnimatedBuses({ buses, onQuickAlarmBus }) {
     const seen = new Set();
     buses.forEach((b) => {
       seen.add(b.id);
+      const fix = { lat: b.lat, lon: b.lon, at: performance.now() };
+      const vel = velocityToward(fix, b.dest, b.eta_s);
       const existing = store.current.get(b.id);
       if (existing) {
-        const cur = existing.marker.getLatLng();
-        // A big jump means the data is from a reopen after a long background —
-        // snap to the real position instead of gliding there for 15 s.
-        const jumped = approxMetres([b.lat, b.lon], [cur.lat, cur.lng]) > 500;
-        existing.from = jumped ? { lat: b.lat, lon: b.lon } : { lat: cur.lat, lon: cur.lng };
-        existing.to = { lat: b.lat, lon: b.lon };
-        existing.start = performance.now();
-        if (jumped) existing.marker.setLatLng([b.lat, b.lon]);
+        existing.fix = fix;
+        existing.vel = vel;
+        // A big gap means stale data from a long background — snap, don't chase.
+        if (approxMetres([b.lat, b.lon], [existing.pos.lat, existing.pos.lon]) > 500) {
+          existing.pos = { lat: b.lat, lon: b.lon };
+          existing.marker.setLatLng([b.lat, b.lon]);
+        }
         if (!existing.marker.isPopupOpen()) {
           existing.marker.setPopupContent(busPopupContent(b, onQuickAlarmBus));
         }
@@ -130,9 +164,7 @@ function AnimatedBuses({ buses, onQuickAlarmBus }) {
         const marker = L.marker([b.lat, b.lon], { icon: busChipIcon(b.service_no), zIndexOffset: 500 })
           .bindPopup(busPopupContent(b, onQuickAlarmBus))
           .addTo(map);
-        store.current.set(b.id, {
-          marker, from: { lat: b.lat, lon: b.lon }, to: { lat: b.lat, lon: b.lon }, start: performance.now(),
-        });
+        store.current.set(b.id, { marker, fix, vel, pos: { lat: b.lat, lon: b.lon } });
       }
     });
     store.current.forEach((m, id) => {
