@@ -306,10 +306,10 @@ export default function BusMap({
     <MapContainer center={points[0] ?? [1.2975, 103.854]} zoom={15} zoomControl={false}
       style={{ height: '100%', width: '100%' }}>
       <TileLayer
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
-        url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
-        subdomains="abcd"
-        maxZoom={20}
+        attribution='<a href="https://www.onemap.gov.sg/" target="_blank" rel="noopener noreferrer">OneMap</a> &copy; contributors | <a href="https://www.sla.gov.sg/" target="_blank" rel="noopener noreferrer">Singapore Land Authority</a>'
+        url="https://www.onemap.gov.sg/maps/tiles/Default/{z}/{x}/{y}.png"
+        minZoom={11}
+        maxZoom={19}
       />
       <ZoomControl position="bottomright" />
       <FitBounds points={points} />
