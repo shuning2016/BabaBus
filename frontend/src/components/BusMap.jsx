@@ -1,5 +1,5 @@
 import L from 'leaflet';
-import { CircleMarker, MapContainer, Marker, Polyline, Popup, TileLayer, ZoomControl, useMap, useMapEvents } from 'react-leaflet';
+import { Circle, CircleMarker, MapContainer, Marker, Polyline, Popup, TileLayer, ZoomControl, useMap, useMapEvents } from 'react-leaflet';
 import { useEffect, useRef, useState } from 'react';
 import { getArrivals } from '../api';
 import { approxMetres } from '../geo';
@@ -64,6 +64,51 @@ const placeIcon = L.divIcon({
   iconSize: [30, 40],
   iconAnchor: [15, 40],
 });
+
+const myLocationIcon = L.divIcon({
+  className: '',
+  html: '<div class="mylocation"><div class="mylocation-halo"></div><div class="mylocation-dot"></div></div>',
+  iconSize: [18, 18],
+  iconAnchor: [9, 9],
+});
+
+/** Live GPS position, watched only while the map pane is on screen and the
+ *  app is in the foreground (a running watch keeps the GPS radio awake). */
+function useMyLocation(active) {
+  const [fix, setFix] = useState(null);
+  const [visible, setVisible] = useState(document.visibilityState !== 'hidden');
+  useEffect(() => {
+    const onVis = () => setVisible(document.visibilityState !== 'hidden');
+    document.addEventListener('visibilitychange', onVis);
+    return () => document.removeEventListener('visibilitychange', onVis);
+  }, []);
+  useEffect(() => {
+    if (!active || !visible || !navigator.geolocation) return undefined;
+    const id = navigator.geolocation.watchPosition(
+      (pos) => setFix({ lat: pos.coords.latitude, lon: pos.coords.longitude, acc: pos.coords.accuracy }),
+      () => {}, // denied / no fix: keep the last dot (or none) — the map still works
+      { enableHighAccuracy: true, maximumAge: 10000, timeout: 30000 }
+    );
+    return () => navigator.geolocation.clearWatch(id);
+  }, [active, visible]);
+  return fix;
+}
+
+/** Blue dot + light accuracy circle, like Google Maps. Non-interactive so taps
+ *  fall through to the stops, buses and map underneath. */
+function MyLocationDot({ fix }) {
+  return (
+    <>
+      {fix.acc > 15 && fix.acc < 2000 && (
+        <Circle center={[fix.lat, fix.lon]} radius={fix.acc} interactive={false}
+          eventHandlers={{ add: (e) => e.target.bringToBack() }}
+          pathOptions={{ color: '#0080C6', weight: 1, opacity: 0.4, fillColor: '#0080C6', fillOpacity: 0.12 }} />
+      )}
+      <Marker position={[fix.lat, fix.lon]} icon={myLocationIcon} interactive={false}
+        keyboard={false} zIndexOffset={1000} />
+    </>
+  );
+}
 
 function FitBounds({ points }) {
   const map = useMap();
@@ -301,6 +346,10 @@ export default function BusMap({
     : target.type === 'bus'
       ? target.positions.map((p) => [p.lat, p.lon])
       : target.route.polyline;
+  const myFix = useMyLocation(active);
+  // The nearby view centers on the GPS fix itself — the blue dot already marks
+  // it, so only pin a center the user picked/searched somewhere else.
+  const showPin = center && !(myFix && approxMetres(center, [myFix.lat, myFix.lon]) < 50);
 
   return (
     <MapContainer center={points[0] ?? [1.2975, 103.854]} zoom={15} zoomControl={false}
@@ -316,9 +365,10 @@ export default function BusMap({
       <InvalidateOnActive active={active} />
       {explore && onPickPoint && <ClickCatcher onPickPoint={onPickPoint} />}
       {explore && onMapMove && <MoveCatcher onMapMove={onMapMove} />}
-      {explore && center && (
+      {explore && showPin && (
         <Marker position={center} icon={placeIcon}><Popup>Selected location</Popup></Marker>
       )}
+      {myFix && <MyLocationDot fix={myFix} />}
       {explore && <AnimatedBuses buses={buses} onQuickAlarmBus={onQuickAlarmBus} />}
       {explore && stops.map((s) => (
         <CircleMarker key={s.id} center={[s.lat, s.lon]} radius={6}

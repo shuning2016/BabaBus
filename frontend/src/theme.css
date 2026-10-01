@@ -146,6 +146,14 @@ button.plain.bell-live { background: var(--shopee-orange); border-radius: 8px; a
   0% { box-shadow: 0 0 0 0 rgba(238, 77, 45, .45); }
   100% { box-shadow: 0 0 0 9px rgba(238, 77, 45, 0); }
 }
+/* Google-style "you are here" dot on the map: solid blue + soft pulsing halo */
+.mylocation { position: relative; width: 18px; height: 18px; }
+.mylocation-dot { position: absolute; inset: 0; background: #0080C6; border: 3px solid #fff; border-radius: 50%; box-shadow: 0 1px 4px rgba(0, 0, 0, .35); }
+.mylocation-halo { position: absolute; inset: 0; border-radius: 50%; background: rgba(0, 128, 198, .35); animation: mylocpulse 2s ease-out infinite; }
+@keyframes mylocpulse {
+  0% { transform: scale(1); opacity: .9; }
+  100% { transform: scale(3.2); opacity: 0; }
+}
 .stale { color: var(--shopee-red); font-size: 11px; font-weight: 700; margin: 6px 0 0; }
 
 /* ---------- Favourite / Nearby panes ---------- */
