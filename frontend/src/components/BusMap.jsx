@@ -4,7 +4,12 @@ import { useEffect, useRef, useState } from 'react';
 import { getArrivals } from '../api';
 import { approxMetres } from '../geo';
 
-const ORANGE = '#EE4D2D';
+// Xuetang palette: cinnabar = action/live, teal = routes & my location, ink = text
+const ORANGE = '#E14B2A'; // cinnabar (name kept — used throughout as "the action colour")
+const INK = '#2A3646';
+const TEAL = '#4FB3A9';
+const MUTED = '#6E7E93';
+const LINE = '#DCE8DE';
 
 /* Dead-reckoned bus motion ("the Uber way"). The displayed bus always CHASES a
    target with easing — new data moves the target, never the bus, so there are
@@ -102,7 +107,7 @@ function MyLocationDot({ fix }) {
       {fix.acc > 15 && fix.acc < 2000 && (
         <Circle center={[fix.lat, fix.lon]} radius={fix.acc} interactive={false}
           eventHandlers={{ add: (e) => e.target.bringToBack() }}
-          pathOptions={{ color: '#0080C6', weight: 1, opacity: 0.4, fillColor: '#0080C6', fillOpacity: 0.12 }} />
+          pathOptions={{ color: TEAL, weight: 1, opacity: 0.4, fillColor: TEAL, fillOpacity: 0.12 }} />
       )}
       <Marker position={[fix.lat, fix.lon]} icon={myLocationIcon} interactive={false}
         keyboard={false} zIndexOffset={1000} />
@@ -146,7 +151,7 @@ function InvalidateOnActive({ active }) {
 function busPopupContent(bus, onQuickAlarmBus) {
   const div = document.createElement('div');
   const label = document.createElement('div');
-  label.style.cssText = 'font-size:12px;color:#172B4D';
+  label.style.cssText = `font-size:12px;color:${INK}`;
   label.innerHTML = `<strong>Bus ${bus.service_no}</strong> — heading to ${bus.toward}`;
   div.appendChild(label);
   if (onQuickAlarmBus) {
@@ -295,8 +300,8 @@ function StopArrivalsPopup({ stop, onAlarmStop, watchedBuses, onToggleWatchBus }
 
   return (
     <div style={{ minWidth: 190 }}>
-      <strong style={{ color: '#172B4D' }}>{stop.name}</strong>{' '}
-      <span style={{ color: '#8794AD', fontSize: 11 }}>{stop.id}</span>
+      <strong style={{ color: INK, fontFamily: "'Fredoka', 'Nunito', sans-serif", fontWeight: 600, fontSize: 14 }}>{stop.name}</strong>{' '}
+      <span style={{ color: MUTED, fontSize: 11 }}>{stop.id}</span>
       {error && <div style={{ fontSize: 12 }}>Couldn't load arrivals</div>}
       {!services && !error && <div style={{ fontSize: 12 }}>Loading arrivals…</div>}
       {services && services.length === 0 && <div style={{ fontSize: 12 }}>No services here</div>}
@@ -306,10 +311,10 @@ function StopArrivalsPopup({ stop, onAlarmStop, watchedBuses, onToggleWatchBus }
             title={isWatching(s) ? 'Watching — click to remove' : 'Click to add to my watching buses'}
             onClick={() => toggle(s.service_no)}
             style={{
-              background: isWatching(s) ? ORANGE : '#fff',
-              color: isWatching(s) ? '#fff' : '#8794AD',
-              border: isWatching(s) ? `1.5px solid ${ORANGE}` : '1.5px solid #E3E6EC',
-              borderRadius: 6, padding: '1px 7px', fontWeight: 700, minWidth: 34,
+              background: isWatching(s) ? ORANGE : '#FDFCF8',
+              color: isWatching(s) ? '#fff' : MUTED,
+              border: isWatching(s) ? `2px solid ${ORANGE}` : `2px solid ${LINE}`,
+              borderRadius: 8, padding: '1px 7px', fontWeight: 700, minWidth: 34,
               textAlign: 'center', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12,
             }}>
             {s.service_no}
@@ -319,7 +324,7 @@ function StopArrivalsPopup({ stop, onAlarmStop, watchedBuses, onToggleWatchBus }
       ))}
       {services && watching.length > 0 && watching.length < services.length && (
         <button
-          style={{ marginTop: 6, background: 'none', border: 'none', color: '#0080C6', fontFamily: 'inherit', fontSize: 11, fontWeight: 700, cursor: 'pointer', padding: 0 }}
+          style={{ marginTop: 6, background: 'none', border: 'none', color: ORANGE, fontFamily: 'inherit', fontSize: 11, fontWeight: 800, cursor: 'pointer', padding: 0 }}
           onClick={() => setShowAll(!showAll)}>
           {showAll ? '▲ Only my watching buses' : `▼ Show all ${services.length} buses`}
         </button>
@@ -397,7 +402,7 @@ export default function BusMap({
         ))}
       {!explore && target.type === 'route' && (
         <>
-          <Polyline positions={target.route.polyline} pathOptions={{ color: '#0080C6', weight: 5, opacity: 0.85 }} />
+          <Polyline positions={target.route.polyline} pathOptions={{ color: TEAL, weight: 5, opacity: 0.9 }} />
           {target.route.stops.map((s) => (
             <CircleMarker key={s.id} center={[s.lat, s.lon]} radius={5}
               pathOptions={{ color: ORANGE, weight: 3, fillColor: '#fff', fillOpacity: 1 }}>
